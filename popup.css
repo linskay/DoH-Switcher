@@ -194,9 +194,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  border-radius: 3px;
   position: relative;
-  transition: border-color 0.2s ease;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .master-hud.hud-connected {
@@ -356,7 +356,7 @@ body {
   letter-spacing: 0.6px;
   padding: 6px 8px;
   cursor: pointer;
-  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
   transition: all 0.15s ease;
 }
 
@@ -449,6 +449,7 @@ body {
   gap: 5px;
   max-height: 220px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 3px;
 }
 
@@ -470,19 +471,20 @@ body {
 .preset-card {
   background: var(--bg-panel);
   border: 1px solid var(--border-dim);
-  padding: 7px 9px;
+  padding: 7px 11px 7px 9px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-radius: 3px;
-  transition: border-color .15s ease, background-color .15s ease;
   position: relative;
   cursor: pointer;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
 }
 
 .preset-card:hover {
   border-color: rgba(0, 240, 255, 0.65);
   background: var(--bg-panel-hover);
+  transform: translateX(2px);
 }
 
 .preset-card.is-active {
@@ -647,7 +649,7 @@ body {
   color: var(--text-secondary);
   padding: 3px 7px;
   cursor: pointer;
-  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 0 100%);
   transition: all 0.15s ease;
 }
 
@@ -665,7 +667,7 @@ body {
   color: #000;
   background: var(--neon-primary);
   padding: 2px 6px;
-  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%);
   box-shadow: 0 0 6px var(--neon-primary);
 }
 
@@ -677,7 +679,7 @@ body {
   background: rgba(252, 238, 10, 0.15);
   border: 1px solid var(--neon-accent);
   padding: 2px 6px;
-  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 4px) 0, 100% 4px, 100% 100%, 0 100%);
   animation: blink-connecting 0.8s infinite alternate;
 }
 
@@ -815,7 +817,7 @@ body {
   letter-spacing: 0.8px;
   padding: 6px;
   cursor: pointer;
-  border-radius: 2px;
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%);
   transition: all 0.15s ease;
   margin-top: 2px;
 }
