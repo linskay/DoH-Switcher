@@ -1,33 +1,59 @@
-# DoH-Switcher // CyberDNS
+# DoH-Switcher // CyberDNS v2.0
 
-Легковесное расширение (Manifest V3) для браузеров Google Chrome и Chromium для быстрого управления и переключения между DNS-over-HTTPS (DoH) серверами в один клик.
-
-Интерфейс выполнен в темной стилистике с настраиваемыми пресетами и прямым управлением системными параметрами безопасности Chromium.
+Легковесное расширение (Manifest V3) для браузеров Google Chrome и Chromium для управления и переключения между DNS-over-HTTPS (DoH) серверами в один клик с встроенной диагностикой и терминалом событий.
 
 ---
 
-## Возможности
+## ⚡ Новые возможности v2.0
 
-- **Переключение в 1 клик**: Мгновенная смена активного DoH-сервера без перезапуска браузера.
-- **Интерактивный HUD**: Отображение текущего состояния (Secure / Auto / Disabled) и активного шаблона DNS.
-- **Динамический бейдж**: Статус работы (ON / AUTO / OFF) на иконке расширения в панели инструментов.
-- **Управление серверами**: Добавление собственных DoH-серверов по URL и удаление любого сервера из списка кнопкой `[✕]`.
-- **Быстрый сброс**:
-  - `AUTO DEFAULT` — возврат к системному автоматическому режиму DNS.
-  - `KILLSWITCH` — полное отключение безопасного DNS.
-- **Автономность**: Написано на чистом Vanilla JS, сохранение состояния в `chrome.storage.local`.
-- **Автоматический сброс сокетов**: Бесшовное переподключение между разными DoH-провайдерами без зависания старых сессий.
+- **Многоэтапный цикл подключения**:
+  - `CONNECTING` — применение политик через Native Host и сброс активных сокетов.
+  - `VERIFYING` — отправка тестового зонда RFC 8484 DNS query к эндпоинту.
+  - `CONNECTED` — подтверждённое рабочее состояние (зелёный индикатор `#00FFA3`).
+  - `ERROR` — безопасный откат при сбое применения настроек.
+- **Реальная диагностика DNS (`TEST DNS`)**:
+  - Измерение фактического времени ответа (RTT в миллисекундах) через стандарт RFC 8484 `application/dns-message`.
+  - Проверка статуса доступности (`ONLINE` / `OFFLINE` / `TIMEOUT`).
+- **Категории и избранное**:
+  - Закрепление любимых серверов вверху списка (кнопка `★`).
+  - Фильтры по категориям: `ALL`, `★ FAVS`, `PRIVACY`, `SECURITY`, `AD BLOCK`, `CUSTOM`.
+- **Информативные карточки серверов**:
+  - Имя провайдера, DoH URL, теги безопасности (Malware Block, AdBlock, Privacy, Fast).
+  - Реальный пинг и статус доступности.
+  - Кнопка пинга `⚡`, подключения и удаления `[✕]` на каждой карточке.
+- **Cyber Terminal & Event Log**:
+  - Журнал системных событий в реальном времени (`SWITCH`, `NATIVE_HOST`, `DIAGNOSTICS`, `PROBE`).
+  - Экспорт и импорт пользовательских серверов в формате JSON.
+- **Обновлённый Native Host**:
+  - Автоматическая нормализация DoH URL (добавление `{?dns}` для исключения ошибок 415/POST).
+  - Сброс кэша DNS через системный вызов `DnsFlushResolverCache`.
+  - Корректная атомарная запись в `HKLM`, `HKCU` и `Local State`.
+
+---
+
+## Цветовая палитра интерфейса
+
+| Элемент | Цвет | Код |
+| :--- | :--- | :--- |
+| **Основной фон** | Deep Obsidian | `#090B12` |
+| **Панели и карточки** | Night City Slate | `#101521` (hover `#141e2b`) |
+| **Основной неон** | Cyber Cyan | `#00F0FF` |
+| **Акцент и действия** | Cyber Yellow | `#FCEE0A` |
+| **Успешное подключение** | Neon Green | `#00FFA3` |
+| **Ошибка и Killswitch** | Crimson Red | `#FF3158` |
+| **Вторичный текст** | Tech Steel | `#65758B` |
+| **Основной текст** | Ice White | `#DCE7F5` |
 
 ---
 
 ## Установка
 
 1. Скачайте исходный код или распакуйте архив релиза.
-2. В Chrome откройте страницу `chrome://extensions/`.
-3. В правом верхнем углу включите тумблер **«Режим разработчика»** (*Developer mode*).
-4. Нажмите кнопку **«Загрузить распакованное расширение»** (*Load unpacked*).
-5. Выберите папку `DoH-Switcher` (содержащую файл `manifest.json`).
-6. *(Опционально)* Для автоматического применения политик в системе запустите файл `install-host.bat`.
+2. В Chrome откройте `chrome://extensions/`.
+3. В правом верхнем углу включите **«Режим разработчика»** (*Developer mode*).
+4. Нажмите **«Загрузить распакованное расширение»** (*Load unpacked*).
+5. Выберите папку `DoH-Switcher`.
+6. Запустите файл `install-host.bat` для регистрации нативного модуля управления политиками.
 
 ---
 
@@ -46,30 +72,26 @@
 
 ## Предустановленные серверы
 
-| Провайдер | Назначение | Шаблон DoH |
-| :--- | :--- | :--- |
-| **Cloudflare** | Высокая скорость и приватность | `https://chrome.cloudflare-dns.com/dns-query` |
-| **Cloudflare Security** | Фильтрация вредоносного ПО | `https://security.cloudflare-dns.com/dns-query` |
-| **Google Public DNS** | Глобальная сеть Anycast | `https://dns.google/dns-query{?dns}` |
-| **AdGuard DNS** | Блокировка рекламы и трекеров | `https://dns.adguard-dns.com/dns-query{?dns}` |
-| **Quad9** | Блокировка угроз и фишинга | `https://dns.quad9.net/dns-query{?dns}` |
-| **Mullvad DNS** | Политика отсутствия логов | `https://dns.mullvad.net/dns-query{?dns}` |
-| **Control D** | Открытый резолвер | `https://freedns.controld.com/p0{?dns}` |
-
-*Примечание:* Для кастомных DoH-серверов расширение автоматически нормализует шаблон запроса, добавляя `{?dns}` при необходимости (чтобы браузер отправлял валидные GET-запросы по стандарту RFC 8484).
+| Провайдер | Категория | Теги | Шаблон DoH |
+| :--- | :--- | :--- | :--- |
+| **Cloudflare** | Privacy | Fast / No-Logs | `https://chrome.cloudflare-dns.com/dns-query` |
+| **Cloudflare Security** | Security | Malware Block | `https://security.cloudflare-dns.com/dns-query` |
+| **Google Public DNS** | Default | Global Anycast | `https://dns.google/dns-query{?dns}` |
+| **AdGuard DNS** | AdBlock | AdBlocker / Trackers | `https://dns.adguard-dns.com/dns-query{?dns}` |
+| **Quad9** | Security | Threat Intel | `https://dns.quad9.net/dns-query{?dns}` |
+| **Mullvad DNS** | Privacy | Strict No-Logs | `https://dns.mullvad.net/dns-query{?dns}` |
+| **Control D** | Privacy | Uncensored / Free | `https://freedns.controld.com/p0{?dns}` |
 
 ---
 
 ## Сборка релиза
-
-Для упаковки расширения в ZIP-архив:
 
 ```bash
 npm run package
 # или: node package.js
 ```
 
-Собранный архив сохраняется в директорию `dist/DoH-Switcher-v1.0.1.zip`.
+Собранный архив сохраняется в директорию `dist/DoH-Switcher-v2.0.0.zip`.
 
 ---
 

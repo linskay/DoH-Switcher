@@ -15,7 +15,7 @@ class Program {
             Stream stdin = Console.OpenStandardInput();
             Stream stdout = Console.OpenStandardOutput();
 
-            // Read 4 bytes length
+            // Read 4-byte message length
             byte[] lenBytes = new byte[4];
             int read = stdin.Read(lenBytes, 0, 4);
             if (read < 4) return;
@@ -33,103 +33,99 @@ class Program {
 
             string json = Encoding.UTF8.GetString(buffer, 0, total);
 
-            // Parse mode & template
-            string mode = "automatic";
-            string template = "";
+            // Handle PING
+            if (json.Contains("\"PING\"")) {
+                SendResponse(stdout, true, "automatic", "", false, false, false, "PONG // Host Ready");
+                return;
+            }
 
-            if (json.Contains("\"mode\":\"secure\"") || json.Contains("\"mode\": \"secure\"")) {
-                mode = "secure";
-            } else if (json.Contains("\"mode\":\"off\"") || json.Contains("\"mode\": \"off\"")) {
-                mode = "off";
-            } else if (json.Contains("\"mode\":\"automatic\"") || json.Contains("\"mode\": \"automatic\"")) {
+            // Extract action, mode, and template cleanly
+            string action = ExtractJsonValue(json, "action");
+            string mode = ExtractJsonValue(json, "mode");
+            string template = ExtractJsonValue(json, "template");
+
+            if (string.IsNullOrEmpty(mode)) {
+                mode = "automatic";
+            } else {
+                mode = mode.ToLowerInvariant();
+            }
+
+            if (mode != "secure" && mode != "off" && mode != "automatic") {
                 mode = "automatic";
             }
 
-            int tIdx = json.IndexOf("\"template\"");
-            if (tIdx >= 0) {
-                int col = json.IndexOf(':', tIdx);
-                int q1 = json.IndexOf('"', col);
-                int q2 = json.IndexOf('"', q1 + 1);
-                if (q1 >= 0 && q2 > q1) {
-                    template = json.Substring(q1 + 1, q2 - q1 - 1).Replace("\\/", "/").Trim();
-                }
-            }
-
-            // Normalize DoH Template: Chrome requires {?dns} for GET request method.
-            // Without {?dns}, Chrome sends POST which many DoH providers (like dns.dagami.ru, AdGuard, Pi-hole) reject with 415.
+            // Normalize DoH Template: Ensure RFC 8484 GET template {?dns}
             if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                template = template.Trim();
                 if (!template.Contains("{?dns}") && !template.Contains("?")) {
                     template = template + "{?dns}";
                 }
+            } else if (mode != "secure") {
+                template = "";
             }
 
-            // CRITICAL FIX: Reset socket pool before applying new secure server.
-            // If already in secure mode, temporarily drop to "off" so Chrome destroys existing active DoH socket connections!
+            // CRITICAL TRANSITION: Teardown existing socket pool if switching in secure mode
             if (mode == "secure") {
-                SetPolicies("off", "");
-                Thread.Sleep(75);
+                SetRegistryPolicies("off", "");
+                Thread.Sleep(60);
             }
 
-            // Apply target configuration
-            bool hklmOk = false;
-            bool hkcuOk = false;
+            bool regOk = false;
             bool localStateOk = false;
+            bool cacheOk = false;
 
-            SetPolicies(mode, template, out hklmOk, out hkcuOk);
-
-            // Update Chromium Local State files directly
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string[] localStatePaths = new string[] {
-                Path.Combine(localAppData, @"Google\Chrome\User Data\Local State"),
-                Path.Combine(localAppData, @"Microsoft\Edge\User Data\Local State"),
-                Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\User Data\Local State"),
-                Path.Combine(localAppData, @"Chromium\User Data\Local State")
-            };
-
-            foreach (string p in localStatePaths) {
-                try {
-                    if (File.Exists(p)) {
-                        UpdateLocalStateDns(p, mode, template);
-                        localStateOk = true;
-                    }
-                } catch {}
+            // 1. Write Registry Policies (HKLM + HKCU)
+            try {
+                regOk = SetRegistryPolicies(mode, template);
+            } catch (Exception ex) {
+                regOk = false;
             }
 
-            // Flush OS DNS resolver cache
+            // 2. Write Chromium Local State
             try {
-                DnsFlushResolverCache();
-            } catch {}
+                localStateOk = UpdateAllLocalStates(mode, template);
+            } catch {
+                localStateOk = false;
+            }
 
-            // Reply to extension
-            string reply = "{\"success\":true,\"mode\":\"" + mode + "\",\"template\":\"" + template + "\",\"hklm\":" + (hklmOk ? "true" : "false") + ",\"hkcu\":" + (hkcuOk ? "true" : "false") + ",\"localState\":" + (localStateOk ? "true" : "false") + "}";
-            byte[] replyBytes = Encoding.UTF8.GetBytes(reply);
-            byte[] outLen = BitConverter.GetBytes(replyBytes.Length);
+            // 3. Flush OS DNS Resolver Cache
+            try {
+                int flushRes = DnsFlushResolverCache();
+                cacheOk = (flushRes == 1 || flushRes == 0);
+            } catch {
+                cacheOk = false;
+            }
 
-            stdout.Write(outLen, 0, 4);
-            stdout.Write(replyBytes, 0, replyBytes.Length);
-            stdout.Flush();
+            // Determine overall success: either registry or local state succeeded
+            bool overallSuccess = (regOk || localStateOk);
+            string msg = overallSuccess ? "DNS policy applied successfully" : "Failed to write policies";
+
+            SendResponse(stdout, overallSuccess, mode, template, regOk, localStateOk, cacheOk, msg);
+
         } catch (Exception ex) {
             try {
                 Stream stdout = Console.OpenStandardOutput();
-                string errReply = "{\"success\":false,\"error\":\"" + ex.Message.Replace("\"", "'") + "\"}";
-                byte[] b = Encoding.UTF8.GetBytes(errReply);
-                stdout.Write(BitConverter.GetBytes(b.Length), 0, 4);
-                stdout.Write(b, 0, b.Length);
-                stdout.Flush();
+                SendResponse(stdout, false, "error", "", false, false, false, "Host Exception: " + ex.Message.Replace("\"", "'"));
             } catch {}
         }
     }
 
-    static void SetPolicies(string mode, string template) {
-        bool a, b;
-        SetPolicies(mode, template, out a, out b);
+    static string ExtractJsonValue(string json, string key) {
+        int idx = json.IndexOf("\"" + key + "\"");
+        if (idx < 0) return "";
+        int colon = json.IndexOf(':', idx);
+        if (colon < 0) return "";
+        int q1 = json.IndexOf('"', colon);
+        if (q1 < 0) return "";
+        int q2 = json.IndexOf('"', q1 + 1);
+        if (q2 < 0) return "";
+        return json.Substring(q1 + 1, q2 - q1 - 1).Replace("\\/", "/");
     }
 
-    static void SetPolicies(string mode, string template, out bool hklmOk, out bool hkcuOk) {
-        hklmOk = false;
-        hkcuOk = false;
+    static bool SetRegistryPolicies(string mode, string template) {
+        bool written = false;
 
-        // 1. Write HKLM
+        // Chrome HKLM
         try {
             using (RegistryKey key = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Google\Chrome")) {
                 if (key != null) {
@@ -139,25 +135,12 @@ class Program {
                     } else {
                         try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
                     }
-                    hklmOk = true;
+                    written = true;
                 }
             }
         } catch {}
 
-        try {
-            using (RegistryKey edgeKey = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
-                if (edgeKey != null) {
-                    edgeKey.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
-                    if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        edgeKey.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
-                    } else {
-                        try { edgeKey.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
-                    }
-                }
-            }
-        } catch {}
-
-        // 2. Write HKCU
+        // Chrome HKCU
         try {
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Google\Chrome")) {
                 if (key != null) {
@@ -167,39 +150,85 @@ class Program {
                     } else {
                         try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
                     }
-                    hkcuOk = true;
+                    written = true;
                 }
             }
         } catch {}
 
+        // Edge HKLM + HKCU
         try {
-            using (RegistryKey edgeKey = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
-                if (edgeKey != null) {
-                    edgeKey.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
+                if (key != null) {
+                    key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
                     if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        edgeKey.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
                     } else {
-                        try { edgeKey.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
                     }
                 }
             }
         } catch {}
+
+        return written;
     }
 
-    static void UpdateLocalStateDns(string filePath, string mode, string template) {
-        string text = File.ReadAllText(filePath, Encoding.UTF8);
+    static bool UpdateAllLocalStates(string mode, string template) {
+        bool any = false;
+        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string[] candidates = new string[] {
+            Path.Combine(localAppData, @"Google\Chrome\User Data\Local State"),
+            Path.Combine(localAppData, @"Microsoft\Edge\User Data\Local State"),
+            Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\User Data\Local State"),
+            Path.Combine(localAppData, @"Chromium\User Data\Local State")
+        };
 
-        string dohReplacement = "\"dns_over_https\":{\"mode\":\"" + mode + "\",\"templates\":\"" + (mode == "secure" ? template : "") + "\"}";
+        foreach (string p in candidates) {
+            try {
+                if (File.Exists(p)) {
+                    UpdateLocalStateFile(p, mode, template);
+                    any = true;
+                }
+            } catch {}
+        }
+        return any;
+    }
+
+    static void UpdateLocalStateFile(string filePath, string mode, string template) {
+        string text = File.ReadAllText(filePath, Encoding.UTF8);
+        string block = "\"dns_over_https\":{\"mode\":\"" + mode + "\",\"templates\":\"" + (mode == "secure" ? template : "") + "\"}";
 
         if (Regex.IsMatch(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}")) {
-            text = Regex.Replace(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}", dohReplacement);
+            text = Regex.Replace(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}", block);
         } else {
-            int firstBrace = text.IndexOf('{');
-            if (firstBrace >= 0) {
-                text = text.Substring(0, firstBrace + 1) + dohReplacement + "," + text.Substring(firstBrace + 1);
+            int brace = text.IndexOf('{');
+            if (brace >= 0) {
+                text = text.Substring(0, brace + 1) + block + "," + text.Substring(brace + 1);
             }
         }
-
         File.WriteAllText(filePath, text, Encoding.UTF8);
+    }
+
+    static void SendResponse(Stream stdout, bool success, string mode, string template, bool registry, bool localState, bool cacheFlushed, string message) {
+        string reply = "{" +
+            "\"success\":" + (success ? "true" : "false") + "," +
+            "\"mode\":\"" + EscapeJson(mode) + "\"," +
+            "\"template\":\"" + EscapeJson(template) + "\"," +
+            "\"registry\":" + (registry ? "true" : "false") + "," +
+            "\"localState\":" + (localState ? "true" : "false") + "," +
+            "\"cacheFlushed\":" + (cacheFlushed ? "true" : "false") + "," +
+            "\"message\":\"" + EscapeJson(message) + "\"" +
+        "}";
+
+        byte[] replyBytes = Encoding.UTF8.GetBytes(reply);
+        byte[] outLen = BitConverter.GetBytes(replyBytes.Length);
+
+        stdout.Write(outLen, 0, 4);
+        stdout.Write(replyBytes, 0, replyBytes.Length);
+        stdout.Flush();
+    }
+
+    static string EscapeJson(string s) {
+        if (s == null) return "";
+        return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "").Replace("\n", " ");
     }
 }

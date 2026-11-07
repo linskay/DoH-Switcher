@@ -1,30 +1,40 @@
 /**
- * DoH-Switcher // CyberDNS - Background Service Worker
+ * DoH-Switcher // CyberDNS v2.0 - Background Service Worker
  * Manages badge status synchronized with persistent storage
  */
 
-function updateBadge(mode) {
+function updateBadge(activeState) {
   try {
-    if (mode === 'secure') {
+    if (!activeState) {
+      chrome.action.setBadgeText({ text: '' });
+      return;
+    }
+
+    if (activeState.connectionState === 'connected' && activeState.mode === 'secure') {
       chrome.action.setBadgeText({ text: 'ON' });
-      chrome.action.setBadgeBackgroundColor({ color: '#00F0FF' }); // Cyber Cyan
+      chrome.action.setBadgeBackgroundColor({ color: '#00FFA3' }); // Neon Green
       if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#0A0B10' });
+        chrome.action.setBadgeTextColor({ color: '#090B12' });
       }
-    } else if (mode === 'automatic') {
-      chrome.action.setBadgeText({ text: 'AUTO' });
-      chrome.action.setBadgeBackgroundColor({ color: '#3A3D4D' }); // Steel Gray
+    } else if (activeState.connectionState === 'connecting') {
+      chrome.action.setBadgeText({ text: '...' });
+      chrome.action.setBadgeBackgroundColor({ color: '#FCEE0A' }); // Accent Yellow
       if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#E0E0E0' });
+        chrome.action.setBadgeTextColor({ color: '#090B12' });
       }
-    } else if (mode === 'off') {
+    } else if (activeState.mode === 'off') {
       chrome.action.setBadgeText({ text: 'OFF' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF003C' }); // Cyber Red
+      chrome.action.setBadgeBackgroundColor({ color: '#FF3158' }); // Error Red
       if (chrome.action.setBadgeTextColor) {
         chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
       }
     } else {
-      chrome.action.setBadgeText({ text: '' });
+      // mode === 'automatic'
+      chrome.action.setBadgeText({ text: 'AUTO' });
+      chrome.action.setBadgeBackgroundColor({ color: '#252D3D' }); // Steel Slate
+      if (chrome.action.setBadgeTextColor) {
+        chrome.action.setBadgeTextColor({ color: '#DCE7F5' });
+      }
     }
   } catch (err) {
     console.error('[DoH-Switcher] Failed to update badge:', err);
@@ -32,9 +42,8 @@ function updateBadge(mode) {
 }
 
 function syncCurrentStatus() {
-  chrome.storage.local.get(['activeMode'], (res) => {
-    const mode = res.activeMode || 'automatic';
-    updateBadge(mode);
+  chrome.storage.local.get(['activeState'], (res) => {
+    updateBadge(res.activeState);
   });
 }
 
@@ -47,10 +56,10 @@ chrome.runtime.onStartup.addListener(() => {
   syncCurrentStatus();
 });
 
-// React whenever activeMode changes in storage
+// React whenever activeState changes in storage
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.activeMode) {
-    updateBadge(changes.activeMode.newValue);
+  if (area === 'local' && changes.activeState) {
+    updateBadge(changes.activeState.newValue);
   }
 });
 

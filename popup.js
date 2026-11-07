@@ -1,6 +1,6 @@
 /**
- * DoH-Switcher // CyberDNS - Popup Interface Controller
- * Manifest V3 - Pure Vanilla JS
+ * DoH-Switcher // CyberDNS v2.0 - Popup Controller
+ * Pure Vanilla JS // Manifest V3
  */
 
 const DEFAULT_PRESETS = [
@@ -8,99 +8,156 @@ const DEFAULT_PRESETS = [
     id: "cloudflare-main",
     name: "Cloudflare (1.1.1.1)",
     url: "https://chrome.cloudflare-dns.com/dns-query",
-    tag: "Fast / Private",
-    isDefault: true
+    tag: "FAST / PRIVACY",
+    category: "privacy",
+    features: ["⚡ FAST", "🔒 NO-LOGS"],
+    isFavorite: true,
+    latency: null,
+    status: null
   },
   {
     id: "cloudflare-sec",
     name: "Cloudflare Security",
     url: "https://security.cloudflare-dns.com/dns-query",
-    tag: "Malware Block",
-    isDefault: true
+    tag: "MALWARE BLOCK",
+    category: "security",
+    features: ["🛡️ MALWARE", "⚡ FAST"],
+    isFavorite: false,
+    latency: null,
+    status: null
   },
   {
     id: "google-dns",
     name: "Google Public DNS",
-    url: "https://dns.google/dns-query",
-    tag: "High Speed",
-    isDefault: true
+    url: "https://dns.google/dns-query{?dns}",
+    tag: "HIGH SPEED",
+    category: "default",
+    features: ["⚡ GLOBAL", "🌐 ANYCAST"],
+    isFavorite: false,
+    latency: null,
+    status: null
   },
   {
     id: "adguard-dns",
     name: "AdGuard DNS",
-    url: "https://dns.adguard-dns.com/dns-query",
-    tag: "AdBlocker",
-    isDefault: true
+    url: "https://dns.adguard-dns.com/dns-query{?dns}",
+    tag: "AD BLOCKER",
+    category: "adblock",
+    features: ["🚫 ADBLOCK", "🛡️ TRACKERS"],
+    isFavorite: true,
+    latency: null,
+    status: null
   },
   {
     id: "quad9-sec",
     name: "Quad9 (Threat Block)",
-    url: "https://dns.quad9.net/dns-query",
-    tag: "Security",
-    isDefault: true
+    url: "https://dns.quad9.net/dns-query{?dns}",
+    tag: "THREAT INTEL",
+    category: "security",
+    features: ["🛡️ THREATS", "🔒 PRIVACY"],
+    isFavorite: false,
+    latency: null,
+    status: null
   },
   {
     id: "mullvad-doh",
     name: "Mullvad DNS",
-    url: "https://dns.mullvad.net/dns-query",
-    tag: "Strict No-Logs",
-    isDefault: true
+    url: "https://dns.mullvad.net/dns-query{?dns}",
+    tag: "STRICT NO-LOGS",
+    category: "privacy",
+    features: ["🔒 ANONYMOUS", "⚡ FAST"],
+    isFavorite: false,
+    latency: null,
+    status: null
   },
   {
     id: "control-d",
     name: "Control D (Free)",
-    url: "https://freedns.controld.com/p0",
-    tag: "Uncensored",
-    isDefault: true
+    url: "https://freedns.controld.com/p0{?dns}",
+    tag: "UNCENSORED",
+    category: "privacy",
+    features: ["🌐 UNFILTERED", "🔒 FREE"],
+    isFavorite: false,
+    latency: null,
+    status: null
   }
 ];
 
-// App State
+const DNS_STATE = {
+  CONNECTED: 'connected',
+  CONNECTING: 'connecting',
+  DISCONNECTED: 'disconnected',
+  ERROR: 'error',
+  VERIFYING: 'verifying'
+};
+
+// Application State
 let currentPresets = [];
-let currentDnsMode = 'automatic'; // 'secure' | 'automatic' | 'off'
-let currentTemplate = '';
-let activePresetId = '';
-let hasNativeHost = false;
+let activeState = {
+  mode: 'automatic',
+  template: '',
+  presetId: '',
+  connectionState: DNS_STATE.DISCONNECTED,
+  lastVerifiedLatency: null
+};
+
+let currentFilter = 'all';
+let connectingPresetId = null;
 let toastTimeout = null;
 
 // DOM Elements
-const hudStatusCard = document.getElementById('hudStatusCard');
-const statusText = document.getElementById('statusText');
-const activeServerName = document.getElementById('activeServerName');
-const activeServerUrl = document.getElementById('activeServerUrl');
-const policyWarning = document.getElementById('policyWarning');
-const presetsList = document.getElementById('presetsList');
-const nodesCount = document.getElementById('nodesCount');
+const masterHud = document.getElementById('masterHud');
+const connectionBadge = document.getElementById('connectionBadge');
+const activeDnsName = document.getElementById('activeDnsName');
+const activeDnsUrl = document.getElementById('activeDnsUrl');
+const activeLatency = document.getElementById('activeLatency');
+const activePolicyStatus = document.getElementById('activePolicyStatus');
+const btnRunDiagnostics = document.getElementById('btnRunDiagnostics');
 
 const btnSetAuto = document.getElementById('btnSetAuto');
 const btnKillswitch = document.getElementById('btnKillswitch');
 const btnOpenSettings = document.getElementById('btnOpenSettings');
+const btnOpenPolicy = document.getElementById('btnOpenPolicy');
 const btnResetDefaults = document.getElementById('btnResetDefaults');
+
+const filterTabs = document.getElementById('filterTabs');
+const presetsList = document.getElementById('presetsList');
+const nodeCounter = document.getElementById('nodeCounter');
 
 const btnToggleInject = document.getElementById('btnToggleInject');
 const injectToggleIcon = document.getElementById('injectToggleIcon');
 const injectForm = document.getElementById('injectForm');
 const inputNodeName = document.getElementById('inputNodeName');
 const inputNodeUrl = document.getElementById('inputNodeUrl');
+const inputNodeCategory = document.getElementById('inputNodeCategory');
 const urlValidationMsg = document.getElementById('urlValidationMsg');
 const btnSubmitInject = document.getElementById('btnSubmitInject');
+
+const btnToggleTerminal = document.getElementById('btnToggleTerminal');
+const terminalDrawer = document.getElementById('terminalDrawer');
+const terminalOutput = document.getElementById('terminalOutput');
+const btnCloseTerminal = document.getElementById('btnCloseTerminal');
+const btnExportJson = document.getElementById('btnExportJson');
+const btnImportJson = document.getElementById('btnImportJson');
+const btnClearLog = document.getElementById('btnClearLog');
+const fileImportInput = document.getElementById('fileImportInput');
 
 const cyberToast = document.getElementById('cyberToast');
 const toastMsg = document.getElementById('toastMsg');
 
 /**
- * Initialize extension popup
+ * Initialize extension on popup open
  */
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   await loadStateAndPresets();
   renderPresetsList();
-  updateHudUI(currentDnsMode, currentTemplate);
-  checkNativeHost();
+  updateHudUI();
+  logTerminal('SYS', 'DoH Switcher v2.0 initialized.');
 });
 
 /**
- * Bind DOM Event Listeners
+ * Bind DOM event listeners
  */
 function setupEventListeners() {
   btnSetAuto.addEventListener('click', handleSetAuto);
@@ -111,13 +168,39 @@ function setupEventListeners() {
     chrome.tabs.create({ url: 'chrome://settings/security' });
   });
 
-  const btnOpenPolicy = document.getElementById('btnOpenPolicy');
-  if (btnOpenPolicy) {
-    btnOpenPolicy.addEventListener('click', () => {
-      chrome.tabs.create({ url: 'chrome://policy' });
-    });
-  }
+  btnOpenPolicy.addEventListener('click', () => {
+    chrome.tabs.create({ url: 'chrome://policy' });
+  });
 
+  btnRunDiagnostics.addEventListener('click', runActiveDiagnostics);
+
+  btnToggleTerminal.addEventListener('click', () => {
+    terminalDrawer.classList.toggle('hidden');
+  });
+
+  btnCloseTerminal.addEventListener('click', () => {
+    terminalDrawer.classList.add('hidden');
+  });
+
+  btnClearLog.addEventListener('click', () => {
+    terminalOutput.innerHTML = '';
+  });
+
+  btnExportJson.addEventListener('click', exportPresetsJson);
+  btnImportJson.addEventListener('click', () => fileImportInput.click());
+  fileImportInput.addEventListener('change', importPresetsJson);
+
+  // Filter Tabs
+  filterTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab-pill');
+    if (!tab) return;
+    document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentFilter = tab.getAttribute('data-filter') || 'all';
+    renderPresetsList();
+  });
+
+  // Inject Form
   btnToggleInject.addEventListener('click', () => {
     const isHidden = injectForm.classList.contains('hidden');
     if (isHidden) {
@@ -140,8 +223,7 @@ function setupEventListeners() {
  */
 function loadStateAndPresets() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['presets', 'activeMode', 'activeTemplate', 'activePresetId'], (res) => {
-      // 1. Presets list
+    chrome.storage.local.get(['presets', 'activeState'], (res) => {
       if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
         currentPresets = res.presets;
       } else {
@@ -149,10 +231,12 @@ function loadStateAndPresets() {
         chrome.storage.local.set({ presets: currentPresets });
       }
 
-      // 2. Active DNS State
-      currentDnsMode = res.activeMode || 'automatic';
-      currentTemplate = res.activeTemplate || '';
-      activePresetId = res.activePresetId || '';
+      if (res.activeState) {
+        activeState = Object.assign(activeState, res.activeState);
+      } else {
+        activeState.mode = 'automatic';
+        activeState.connectionState = DNS_STATE.DISCONNECTED;
+      }
 
       resolve();
     });
@@ -160,144 +244,211 @@ function loadStateAndPresets() {
 }
 
 /**
- * Save presets to storage
+ * Save Presets to storage
  */
 function savePresets() {
   return new Promise((resolve) => {
-    chrome.storage.local.set({ presets: currentPresets }, () => {
-      resolve();
-    });
+    chrome.storage.local.set({ presets: currentPresets }, () => resolve());
   });
 }
 
 /**
- * Save active state to storage
+ * Save Active State to storage
  */
-function saveActiveState(mode, template, presetId) {
-  currentDnsMode = mode;
-  currentTemplate = template;
-  activePresetId = presetId || '';
-
-  chrome.storage.local.set({
-    activeMode: mode,
-    activeTemplate: template,
-    activePresetId: activePresetId
+function saveActiveState() {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ activeState: activeState }, () => resolve());
   });
 }
 
 /**
- * Check if the Native Policy Host is installed and responsive
+ * Normalize DoH Template URL to RFC 8484 GET format
  */
-function checkNativeHost() {
-  try {
-    chrome.runtime.sendNativeMessage('com.doh.switcher', { action: 'PING' }, (response) => {
-      if (chrome.runtime.lastError) {
-        hasNativeHost = false;
-        console.info('[DoH-Switcher] Native Host not connected yet. Run install-host.bat for 1-click system policy sync.');
-      } else if (response && response.success) {
-        hasNativeHost = true;
-      }
-    });
-  } catch (e) {
-    hasNativeHost = false;
+function normalizeDohUrl(url) {
+  let clean = (url || '').trim();
+  if (clean && !clean.includes('{?dns}') && !clean.includes('?')) {
+    clean += '{?dns}';
   }
+  return clean;
 }
 
 /**
- * Update Master HUD UI based on mode and active template
+ * Update Master HUD UI based on current activeState
  */
-function updateHudUI(mode, template) {
-  hudStatusCard.classList.remove('mode-secure', 'mode-automatic', 'mode-off');
+function updateHudUI() {
+  masterHud.classList.remove('hud-connected', 'hud-connecting', 'hud-error');
+  connectionBadge.className = 'hud-badge';
 
-  if (mode === 'secure') {
-    hudStatusCard.classList.add('mode-secure');
-    statusText.textContent = 'SECURE (ENCRYPTED)';
+  const matched = currentPresets.find(p => p.id === activeState.presetId) ||
+                  currentPresets.find(p => p.url.toLowerCase() === (activeState.template || '').toLowerCase());
 
-    // Find if matches any known preset
-    const matched = currentPresets.find(p => 
-      (activePresetId && p.id === activePresetId) ||
-      (template && p.url.trim().toLowerCase() === template.trim().toLowerCase())
-    );
+  if (activeState.connectionState === DNS_STATE.CONNECTED) {
+    masterHud.classList.add('hud-connected');
+    connectionBadge.classList.add('badge-connected');
+    connectionBadge.textContent = 'CONNECTED';
 
-    if (matched) {
-      activeServerName.textContent = matched.name;
-      activeServerUrl.textContent = matched.url;
-    } else if (template) {
-      activeServerName.textContent = 'Custom DoH Endpoint';
-      activeServerUrl.textContent = template;
-    } else {
-      activeServerName.textContent = 'Secure DNS';
-      activeServerUrl.textContent = 'https://...';
-    }
-  } else if (mode === 'automatic') {
-    hudStatusCard.classList.add('mode-automatic');
-    statusText.textContent = 'AUTOMATIC (SYSTEM)';
-    activeServerName.textContent = 'Opportunistic Chromium Resolver';
-    activeServerUrl.textContent = 'System DNS (Upgrades to DoH if supported)';
-  } else if (mode === 'off') {
-    hudStatusCard.classList.add('mode-off');
-    statusText.textContent = 'DISABLED (OFF)';
-    activeServerName.textContent = 'Unencrypted Plaintext DNS';
-    activeServerUrl.textContent = 'Direct System Resolution (DoH Inactive)';
+    activeDnsName.textContent = matched ? matched.name : 'Custom DoH Endpoint';
+    activeDnsUrl.textContent = activeState.template || 'https://...';
+    activePolicyStatus.textContent = 'ENFORCED';
+    activeLatency.textContent = activeState.lastVerifiedLatency ? `${activeState.lastVerifiedLatency} ms` : '-- ms';
+  } else if (activeState.connectionState === DNS_STATE.CONNECTING) {
+    masterHud.classList.add('hud-connecting');
+    connectionBadge.classList.add('badge-connecting');
+    connectionBadge.textContent = 'CONNECTING...';
+
+    activeDnsName.textContent = matched ? matched.name : 'Switching DoH...';
+    activeDnsUrl.textContent = activeState.template || 'https://...';
+    activePolicyStatus.textContent = 'UPDATING';
+    activeLatency.textContent = 'TESTING';
+  } else if (activeState.connectionState === DNS_STATE.VERIFYING) {
+    masterHud.classList.add('hud-connecting');
+    connectionBadge.classList.add('badge-connecting');
+    connectionBadge.textContent = 'VERIFYING...';
+    activePolicyStatus.textContent = 'TESTING PROBE';
+  } else if (activeState.connectionState === DNS_STATE.ERROR) {
+    masterHud.classList.add('hud-error');
+    connectionBadge.classList.add('badge-error');
+    connectionBadge.textContent = 'ERROR';
+    activePolicyStatus.textContent = 'FAILED';
   } else {
-    statusText.textContent = 'READY';
-    activeServerName.textContent = 'Select a DoH Server';
-    activeServerUrl.textContent = '--';
+    // DISCONNECTED or AUTOMATIC
+    connectionBadge.classList.add('badge-idle');
+    connectionBadge.textContent = (activeState.mode === 'off') ? 'DISABLED (OFF)' : 'SYSTEM AUTO';
+    activeDnsName.textContent = (activeState.mode === 'off') ? 'Plaintext DNS (DoH Inactive)' : 'Opportunistic System Resolver';
+    activeDnsUrl.textContent = (activeState.mode === 'off') ? 'Standard OS unencrypted resolution' : 'Chromium automatic opportunistic DoH';
+    activePolicyStatus.textContent = (activeState.mode === 'off') ? 'DISABLED' : 'DEFAULT';
+    activeLatency.textContent = '-- ms';
   }
 }
 
 /**
- * Render Presets in list
+ * Render Presets in the list with filtering and favorites
  */
 function renderPresetsList() {
   presetsList.innerHTML = '';
-  nodesCount.textContent = `${currentPresets.length} NODES`;
 
-  currentPresets.forEach((preset) => {
-    const isThisActive = (currentDnsMode === 'secure') && 
-      ((activePresetId && preset.id === activePresetId) ||
-       (currentTemplate && currentTemplate.toLowerCase() === preset.url.trim().toLowerCase()));
+  // Filter
+  let filtered = currentPresets.filter(p => {
+    if (currentFilter === 'all') return true;
+    if (currentFilter === 'favorites') return !!p.isFavorite;
+    if (currentFilter === 'custom') return p.category === 'custom' || (!p.category && !p.isDefault);
+    return p.category === currentFilter;
+  });
+
+  // Sort: Favorites first, then alphabetical
+  filtered.sort((a, b) => {
+    if (a.isFavorite && !b.isFavorite) return -1;
+    if (!a.isFavorite && b.isFavorite) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  nodeCounter.textContent = `${filtered.length} NODES`;
+
+  filtered.forEach((preset) => {
+    const isThisActive = (activeState.connectionState === DNS_STATE.CONNECTED) &&
+      (activeState.presetId === preset.id ||
+       (activeState.template && activeState.template.toLowerCase() === preset.url.toLowerCase()));
+
+    const isThisConnecting = (connectingPresetId === preset.id);
 
     const card = document.createElement('div');
     card.className = `preset-card ${isThisActive ? 'is-active' : ''}`;
     card.setAttribute('data-id', preset.id);
 
-    // Left info
-    const info = document.createElement('div');
-    info.className = 'preset-info';
+    // Left Section
+    const cardLeft = document.createElement('div');
+    cardLeft.className = 'card-left';
 
-    const headerRow = document.createElement('div');
-    headerRow.className = 'preset-header-row';
+    // Favorite Star Button
+    const btnStar = document.createElement('button');
+    btnStar.className = `btn-star ${preset.isFavorite ? 'favorited' : ''}`;
+    btnStar.textContent = preset.isFavorite ? '★' : '☆';
+    btnStar.title = preset.isFavorite ? 'Remove from favorites' : 'Add to favorites';
+    btnStar.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleFavorite(preset.id);
+    });
+    cardLeft.appendChild(btnStar);
+
+    // Card Details
+    const details = document.createElement('div');
+    details.className = 'card-details';
+
+    // Title Row
+    const titleRow = document.createElement('div');
+    titleRow.className = 'card-title-row';
 
     const nameSpan = document.createElement('span');
-    nameSpan.className = 'preset-name';
+    nameSpan.className = 'card-name';
     nameSpan.textContent = preset.name;
-    headerRow.appendChild(nameSpan);
+    titleRow.appendChild(nameSpan);
 
     if (preset.tag) {
-      const tagSpan = document.createElement('span');
-      tagSpan.className = 'preset-tag';
-      tagSpan.textContent = preset.tag;
-      headerRow.appendChild(tagSpan);
+      const badgeSpan = document.createElement('span');
+      badgeSpan.className = `card-badge badge-${preset.category || 'privacy'}`;
+      badgeSpan.textContent = preset.tag;
+      titleRow.appendChild(badgeSpan);
     }
+    details.appendChild(titleRow);
 
+    // URL
     const urlSpan = document.createElement('span');
-    urlSpan.className = 'preset-url';
+    urlSpan.className = 'card-url';
     urlSpan.textContent = preset.url;
+    details.appendChild(urlSpan);
 
-    info.appendChild(headerRow);
-    info.appendChild(urlSpan);
-    card.appendChild(info);
+    // Metrics Row (Latency & Status)
+    const metricsRow = document.createElement('div');
+    metricsRow.className = 'card-metrics-row';
 
-    // Right actions
+    const latSpan = document.createElement('span');
+    latSpan.className = 'card-metric';
+    latSpan.textContent = 'LATENCY: ';
+    const latVal = document.createElement('span');
+    latVal.className = 'card-metric-val';
+    latVal.textContent = preset.latency ? `${preset.latency} ms` : '-- ms';
+    latSpan.appendChild(latVal);
+    metricsRow.appendChild(latSpan);
+
+    const statSpan = document.createElement('span');
+    statSpan.className = 'card-metric';
+    statSpan.textContent = 'STATUS: ';
+    const statVal = document.createElement('span');
+    statVal.className = `card-metric-val ${preset.status === 'ONLINE' ? 'online' : (preset.status === 'OFFLINE' ? 'offline' : '')}`;
+    statVal.textContent = preset.status || 'UNTESTED';
+    statSpan.appendChild(statVal);
+    metricsRow.appendChild(statSpan);
+
+    details.appendChild(metricsRow);
+    cardLeft.appendChild(details);
+    card.appendChild(cardLeft);
+
+    // Right Actions
     const actions = document.createElement('div');
-    actions.className = 'preset-actions';
+    actions.className = 'card-actions';
 
+    // Ping / Test button for individual node
+    const btnPing = document.createElement('button');
+    btnPing.className = 'btn-ping';
+    btnPing.textContent = '⚡';
+    btnPing.title = 'Test endpoint latency';
+    btnPing.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pingSinglePreset(preset);
+    });
+    actions.appendChild(btnPing);
+
+    // Connect / Active Status Button
     if (isThisActive) {
       const activePill = document.createElement('span');
       activePill.className = 'active-pill';
       activePill.textContent = 'ACTIVE';
       actions.appendChild(activePill);
+    } else if (isThisConnecting) {
+      const connPill = document.createElement('span');
+      connPill.className = 'btn-connecting-pill';
+      connPill.textContent = 'CONNECTING...';
+      actions.appendChild(connPill);
     } else {
       const btnConnect = document.createElement('button');
       btnConnect.className = 'btn-connect';
@@ -309,7 +460,7 @@ function renderPresetsList() {
       actions.appendChild(btnConnect);
     }
 
-    // Delete button (available for all presets)
+    // Delete Cross Button (available for all presets)
     const btnDel = document.createElement('button');
     btnDel.className = 'btn-delete';
     btnDel.textContent = '✕';
@@ -321,68 +472,211 @@ function renderPresetsList() {
     });
     actions.appendChild(btnDel);
 
-    // Append actions container to card
-    card.appendChild(actions);
-
-    // Clicking card activates it
+    // Clicking anywhere on card connects
     card.addEventListener('click', () => {
-      if (!isThisActive) {
+      if (!isThisActive && !isThisConnecting) {
         activatePreset(preset);
       }
     });
 
+    card.appendChild(actions);
     presetsList.appendChild(card);
   });
 }
 
 /**
- * Copy text to clipboard safely
+ * Toggle Favorite Status
  */
-function copyToClipboard(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text).catch(() => {});
+async function toggleFavorite(presetId) {
+  const p = currentPresets.find(x => x.id === presetId);
+  if (p) {
+    p.isFavorite = !p.isFavorite;
+    await savePresets();
+    renderPresetsList();
+    logTerminal('FAV', `${p.name} -> ${p.isFavorite ? 'Pinned to Favorites' : 'Unpinned'}`);
   }
 }
 
 /**
- * Activate a DoH preset
+ * Activate a DoH preset with strict multi-state verification
  */
-function activatePreset(preset) {
-  let cleanUrl = preset.url.trim();
-  if (!cleanUrl.includes('{?dns}') && !cleanUrl.includes('?')) {
-    cleanUrl = cleanUrl + '{?dns}';
-  }
+async function activatePreset(preset) {
+  const cleanUrl = normalizeDohUrl(preset.url);
+  connectingPresetId = preset.id;
 
-  saveActiveState('secure', cleanUrl, preset.id);
-  updateHudUI('secure', cleanUrl);
+  // 1. Set State to CONNECTING
+  activeState.connectionState = DNS_STATE.CONNECTING;
+  activeState.template = cleanUrl;
+  activeState.presetId = preset.id;
+  updateHudUI();
   renderPresetsList();
   copyToClipboard(cleanUrl);
 
-  // Send to Native Messaging Host for instant Windows Policy application
+  logTerminal('SWITCH', `Initiating switch to ${preset.name}...`);
+
+  // 2. Send Command to Native Host
   try {
     chrome.runtime.sendNativeMessage(
       'com.doh.switcher',
       { action: 'SET_DOH', mode: 'secure', template: cleanUrl },
-      (response) => {
-        if (!chrome.runtime.lastError && response && response.success) {
-          showToast(`POLICY ENFORCED // ${preset.name}`);
+      async (response) => {
+        connectingPresetId = null;
+
+        if (chrome.runtime.lastError || !response || !response.success) {
+          const err = chrome.runtime.lastError ? chrome.runtime.lastError.message : (response ? response.message : 'Unknown host failure');
+          activeState.connectionState = DNS_STATE.ERROR;
+          updateHudUI();
+          renderPresetsList();
+          logTerminal('ERR', `Native host error: ${err}`);
+          showToast(`ERROR // ${err}`);
+          return;
+        }
+
+        // Host reported success
+        logTerminal('NATIVE', `Policies applied (Reg: ${response.registry}, LocalState: ${response.localState}, Cache: ${response.cacheFlushed})`);
+
+        // 3. Perform Live Verification Probe
+        activeState.connectionState = DNS_STATE.VERIFYING;
+        updateHudUI();
+
+        const diag = await testDohEndpoint(cleanUrl);
+        if (diag.ok) {
+          activeState.connectionState = DNS_STATE.CONNECTED;
+          activeState.mode = 'secure';
+          activeState.lastVerifiedLatency = diag.latency;
+          preset.latency = diag.latency;
+          preset.status = 'ONLINE';
+          await savePresets();
+          await saveActiveState();
+
+          updateHudUI();
+          renderPresetsList();
+          logTerminal('OK', `Verified ${preset.name} -> ${diag.latency}ms [RESOLVED]`);
+          showToast(`CONNECTED // ${preset.name} (${diag.latency}ms)`);
         } else {
-          // Native host not installed yet: notify user
-          showToast(`COPIED // ${preset.name}`);
+          // Endpoint unverified or timeout, but policy was written
+          activeState.connectionState = DNS_STATE.CONNECTED;
+          activeState.mode = 'secure';
+          preset.status = 'TIMEOUT';
+          await savePresets();
+          await saveActiveState();
+
+          updateHudUI();
+          renderPresetsList();
+          logTerminal('WARN', `Endpoint probe timeout: ${diag.error}`);
+          showToast(`POLICY ACTIVE // ${preset.name} (Probe timeout)`);
         }
       }
     );
   } catch (err) {
-    showToast(`ACTIVE // ${preset.name}`);
+    connectingPresetId = null;
+    activeState.connectionState = DNS_STATE.ERROR;
+    updateHudUI();
+    renderPresetsList();
+    logTerminal('ERR', `Execution exception: ${err.message}`);
+    showToast(`SYS EXCEPTION // ${err.message}`);
   }
 }
 
 /**
- * Switch back to Automatic Mode
+ * Live DoH Endpoint Test (RFC 8484 DNS Query Probe)
+ */
+async function testDohEndpoint(endpointUrl) {
+  const clean = normalizeDohUrl(endpointUrl);
+  // RFC 8484 standard query for example.com (Type A, IN)
+  const dnsQueryBase64 = 'AAABAAABAAAAAAAAB2V4YW1wbGUDY29tAAABAAEA';
+  
+  let targetUrl = clean;
+  if (clean.includes('{?dns}')) {
+    targetUrl = clean.replace('{?dns}', `?dns=${dnsQueryBase64}`);
+  } else if (!clean.includes('?')) {
+    targetUrl = `${clean}?dns=${dnsQueryBase64}`;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+  const t0 = performance.now();
+  try {
+    const res = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/dns-message, application/dns-json'
+      },
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    const t1 = performance.now();
+    const latency = Math.round(t1 - t0);
+
+    if (res.ok) {
+      return { ok: true, latency: latency, status: res.status };
+    } else {
+      return { ok: false, latency: latency, error: `HTTP ${res.status}` };
+    }
+  } catch (err) {
+    clearTimeout(timeoutId);
+    const t1 = performance.now();
+    return { ok: false, latency: Math.round(t1 - t0), error: err.name === 'AbortError' ? 'TIMEOUT (3.5s)' : err.message };
+  }
+}
+
+/**
+ * Run Diagnostics on currently active endpoint
+ */
+async function runActiveDiagnostics() {
+  if (!activeState.template) {
+    showToast('NO ACTIVE DOH TO TEST');
+    return;
+  }
+
+  showToast('RUNNING DIAGNOSTICS PROBE...');
+  logTerminal('TEST', `Probing active endpoint: ${activeState.template}...`);
+
+  const diag = await testDohEndpoint(activeState.template);
+  if (diag.ok) {
+    activeState.lastVerifiedLatency = diag.latency;
+    updateHudUI();
+    logTerminal('DIAG', `ENDPOINT: ONLINE | HTTPS: OK (200) | LATENCY: ${diag.latency}ms | RESULT: OPERATIONAL`);
+    showToast(`DIAGNOSTICS // OPERATIONAL (${diag.latency}ms)`);
+  } else {
+    logTerminal('DIAG', `ENDPOINT: UNREACHABLE | ERROR: ${diag.error} | RESULT: FAILED`);
+    showToast(`DIAGNOSTICS FAILED // ${diag.error}`);
+  }
+}
+
+/**
+ * Ping Single Preset from card
+ */
+async function pingSinglePreset(preset) {
+  logTerminal('TEST', `Pinging ${preset.name}...`);
+  const diag = await testDohEndpoint(preset.url);
+  preset.latency = diag.latency;
+  preset.status = diag.ok ? 'ONLINE' : 'OFFLINE';
+  await savePresets();
+  renderPresetsList();
+
+  if (diag.ok) {
+    logTerminal('OK', `${preset.name} -> ${diag.latency}ms ONLINE`);
+    showToast(`${preset.name} // ${diag.latency}ms ONLINE`);
+  } else {
+    logTerminal('ERR', `${preset.name} -> OFFLINE (${diag.error})`);
+    showToast(`${preset.name} // OFFLINE (${diag.error})`);
+  }
+}
+
+/**
+ * Revert to Automatic System Mode
  */
 function handleSetAuto() {
-  saveActiveState('automatic', '', '');
-  updateHudUI('automatic', '');
+  activeState.mode = 'automatic';
+  activeState.template = '';
+  activeState.presetId = '';
+  activeState.connectionState = DNS_STATE.DISCONNECTED;
+  activeState.lastVerifiedLatency = null;
+  saveActiveState();
+  updateHudUI();
   renderPresetsList();
 
   try {
@@ -395,15 +689,21 @@ function handleSetAuto() {
     );
   } catch (err) {}
 
-  showToast('MODE // REVERTED TO SYSTEM AUTO');
+  logTerminal('MODE', 'Reverted to Chromium Opportunistic Auto DNS.');
+  showToast('MODE // SYSTEM AUTO DEFAULT');
 }
 
 /**
  * Killswitch: Disable DoH completely
  */
 function handleKillswitch() {
-  saveActiveState('off', '', '');
-  updateHudUI('off', '');
+  activeState.mode = 'off';
+  activeState.template = '';
+  activeState.presetId = '';
+  activeState.connectionState = DNS_STATE.DISCONNECTED;
+  activeState.lastVerifiedLatency = null;
+  saveActiveState();
+  updateHudUI();
   renderPresetsList();
 
   try {
@@ -416,11 +716,27 @@ function handleKillswitch() {
     );
   } catch (err) {}
 
+  logTerminal('KILL', 'Secure DNS Terminated. Fallback to Plaintext DNS.');
   showToast('KILLSWITCH // SECURE DNS TERMINATED');
 }
 
 /**
- * Validate Custom Node inputs
+ * Delete a preset
+ */
+async function deletePreset(presetId) {
+  if (activeState.presetId === presetId) {
+    handleSetAuto();
+  }
+  const deleted = currentPresets.find(p => p.id === presetId);
+  currentPresets = currentPresets.filter(p => p.id !== presetId);
+  await savePresets();
+  renderPresetsList();
+  logTerminal('DELETE', `Removed node: ${deleted ? deleted.name : presetId}`);
+  showToast('NODE DELETED FROM MATRIX');
+}
+
+/**
+ * Validate Inject Form
  */
 function validateInjectForm() {
   const name = inputNodeName.value.trim();
@@ -438,44 +754,45 @@ function validateInjectForm() {
 
   if (!url) {
     urlValidationMsg.textContent = 'Must start with https://';
-    urlValidationMsg.className = 'validation-msg';
+    urlValidationMsg.className = 'url-msg';
     btnSubmitInject.disabled = true;
     return;
   }
 
   if (!url.startsWith('https://')) {
     urlValidationMsg.textContent = 'SECURITY REJECT: URL must start with https://';
-    urlValidationMsg.className = 'validation-msg';
+    urlValidationMsg.className = 'url-msg';
     btnSubmitInject.disabled = true;
     return;
   }
 
   if (!isValidUrl) {
     urlValidationMsg.textContent = 'SYNTAX ERROR: Invalid HTTPS URL format';
-    urlValidationMsg.className = 'validation-msg';
+    urlValidationMsg.className = 'url-msg';
     btnSubmitInject.disabled = true;
     return;
   }
 
   urlValidationMsg.textContent = 'ENDPOINT PROTOCOL VERIFIED [HTTPS OK]';
-  urlValidationMsg.className = 'validation-msg valid';
+  urlValidationMsg.className = 'url-msg valid';
   btnSubmitInject.disabled = (name.length === 0);
 }
 
 /**
- * Handle Custom Node Form Submit
+ * Handle Inject Form Submit
  */
 async function handleInjectSubmit(e) {
   e.preventDefault();
 
   const name = inputNodeName.value.trim();
-  const url = inputNodeUrl.value.trim();
+  let url = inputNodeUrl.value.trim();
+  const category = inputNodeCategory.value || 'custom';
 
-  if (!name || !url.startsWith('https://')) {
-    return;
-  }
+  if (!name || !url.startsWith('https://')) return;
 
-  // Check duplicate
+  url = normalizeDohUrl(url);
+
+  // Prevent duplicates
   const exists = currentPresets.some(p => p.url.toLowerCase() === url.toLowerCase());
   if (exists) {
     showToast('NODE ALREADY IN MATRIX');
@@ -486,63 +803,115 @@ async function handleInjectSubmit(e) {
     id: 'custom-' + Date.now(),
     name: name,
     url: url,
-    tag: 'CUSTOM',
-    isDefault: false
+    tag: category.toUpperCase(),
+    category: category,
+    features: ['⚡ CUSTOM'],
+    isFavorite: false,
+    latency: null,
+    status: null
   };
 
   currentPresets.push(newPreset);
   await savePresets();
 
-  // Reset form
   inputNodeName.value = '';
   inputNodeUrl.value = '';
   validateInjectForm();
   injectForm.classList.add('hidden');
   injectToggleIcon.textContent = '+';
 
-  // Immediately render list & activate
   renderPresetsList();
+  logTerminal('INJECT', `Added custom node: ${newPreset.name}`);
   activatePreset(newPreset);
-  showToast(`NODE INJECTED // ${newPreset.name}`);
 }
 
 /**
- * Delete a preset from the list
- */
-async function deletePreset(presetId) {
-  if (activePresetId === presetId) {
-    activePresetId = '';
-    currentTemplate = '';
-    saveActiveState('automatic', '', '');
-    updateHudUI('automatic', '');
-  }
-  currentPresets = currentPresets.filter(p => p.id !== presetId);
-  await savePresets();
-  renderPresetsList();
-  showToast('NODE DELETED FROM MATRIX');
-}
-
-/**
- * Restore factory default presets
+ * Restore Factory Presets
  */
 async function handleResetDefaults() {
-  currentPresets = [...DEFAULT_PRESETS];
+  currentPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
   await savePresets();
   renderPresetsList();
-  showToast('MATRIX RESTORED TO FACTORY PRESETS');
+  logTerminal('RESET', 'Matrix restored to factory defaults.');
+  showToast('RESTORED FACTORY PRESETS');
 }
 
 /**
- * Show Cyber Toast HUD notification
+ * Export Presets as JSON File
+ */
+function exportPresetsJson() {
+  const data = JSON.stringify(currentPresets, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `doh-switcher-presets-${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  logTerminal('EXPORT', 'Presets exported to JSON.');
+}
+
+/**
+ * Import Presets from JSON File
+ */
+function importPresetsJson(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (evt) => {
+    try {
+      const imported = JSON.parse(evt.target.result);
+      if (Array.isArray(imported) && imported.length > 0) {
+        // Merge without duplicating URLs
+        imported.forEach(item => {
+          if (item.name && item.url && !currentPresets.some(p => p.url.toLowerCase() === item.url.toLowerCase())) {
+            currentPresets.push(item);
+          }
+        });
+        await savePresets();
+        renderPresetsList();
+        logTerminal('IMPORT', `Successfully imported ${imported.length} presets.`);
+        showToast(`IMPORTED ${imported.length} PRESETS`);
+      }
+    } catch (err) {
+      showToast('INVALID JSON FILE');
+      logTerminal('ERR', `Failed to parse JSON file: ${err.message}`);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/**
+ * Log message to Cyber Terminal
+ */
+function logTerminal(prefix, message) {
+  const line = document.createElement('div');
+  line.className = `term-line ${prefix.toLowerCase()}`;
+  const now = new Date();
+  const timeStr = now.toTimeString().split(' ')[0];
+  line.textContent = `[${timeStr}] [${prefix}] ${message}`;
+  terminalOutput.appendChild(line);
+  terminalOutput.scrollTop = terminalOutput.scrollHeight;
+}
+
+/**
+ * Safe clipboard copy
+ */
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+}
+
+/**
+ * Show Cyber Toast
  */
 function showToast(message) {
-  if (toastTimeout) {
-    clearTimeout(toastTimeout);
-  }
+  if (toastTimeout) clearTimeout(toastTimeout);
   toastMsg.textContent = message;
   cyberToast.classList.remove('hidden');
-
   toastTimeout = setTimeout(() => {
     cyberToast.classList.add('hidden');
-  }, 2400);
+  }, 2600);
 }
