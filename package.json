@@ -1,6 +1,6 @@
 {
   "name": "doh-switcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cyberpunk 2077 styled 1-click DoH DNS Switcher for Google Chrome & Chromium browsers",
   "main": "background.js",
   "scripts": {

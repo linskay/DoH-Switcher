@@ -312,8 +312,9 @@ function renderPresetsList() {
     // Delete button (available for all presets)
     const btnDel = document.createElement('button');
     btnDel.className = 'btn-delete';
-    btnDel.innerHTML = '&#x2715;'; // Cross
+    btnDel.textContent = '✕';
     btnDel.title = 'Delete node';
+    btnDel.setAttribute('aria-label', 'Delete node');
     btnDel.addEventListener('click', (e) => {
       e.stopPropagation();
       deletePreset(preset.id);
@@ -344,16 +345,21 @@ function copyToClipboard(text) {
  * Activate a DoH preset
  */
 function activatePreset(preset) {
-  saveActiveState('secure', preset.url, preset.id);
-  updateHudUI('secure', preset.url);
+  let cleanUrl = preset.url.trim();
+  if (!cleanUrl.includes('{?dns}') && !cleanUrl.includes('?')) {
+    cleanUrl = cleanUrl + '{?dns}';
+  }
+
+  saveActiveState('secure', cleanUrl, preset.id);
+  updateHudUI('secure', cleanUrl);
   renderPresetsList();
-  copyToClipboard(preset.url);
+  copyToClipboard(cleanUrl);
 
   // Send to Native Messaging Host for instant Windows Policy application
   try {
     chrome.runtime.sendNativeMessage(
       'com.doh.switcher',
-      { action: 'SET_DOH', mode: 'secure', template: preset.url },
+      { action: 'SET_DOH', mode: 'secure', template: cleanUrl },
       (response) => {
         if (!chrome.runtime.lastError && response && response.success) {
           showToast(`POLICY ENFORCED // ${preset.name}`);
