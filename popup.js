@@ -426,7 +426,7 @@ function renderPresetsList() {
     // Ping / Test button for individual node
     const btnPing = document.createElement('button');
     btnPing.className = 'btn-ping';
-    btnPing.textContent = '⚡';
+    btnPing.innerHTML = '<svg class="icon-bolt" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>';
     btnPing.title = 'Test endpoint latency';
     btnPing.addEventListener('click', (e) => {
       e.stopPropagation();

@@ -39,9 +39,9 @@ body {
   max-height: 600px;
   background-color: var(--bg-main);
   background-image: 
-    linear-gradient(rgba(0, 240, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 240, 255, 0.045) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 65%);
+    linear-gradient(to right, rgba(0, 240, 255, 0.14) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.14) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.15) 0%, transparent 80%);
   background-size: 20px 20px, 20px 20px, 100% 100%;
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -649,19 +649,25 @@ body::-webkit-scrollbar-thumb:hover {
 
 .btn-ping {
   background: transparent;
-  border: 1px solid var(--border-dim);
-  color: var(--text-secondary);
-  font-size: 10px;
-  padding: 3px 5px;
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  color: var(--neon-primary);
+  width: 19px;
+  height: 19px;
+  padding: 0;
   border-radius: 2px;
   cursor: pointer;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .btn-ping:hover {
   border-color: var(--neon-primary);
-  color: var(--neon-primary);
+  color: #fff;
+  background: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.45);
 }
 
 .btn-connect {
@@ -1047,4 +1053,11 @@ body::-webkit-scrollbar-thumb:hover {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+
+.icon-bolt {
+  display: block;
+  pointer-events: none;
+  flex-shrink: 0;
 }
