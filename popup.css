@@ -34,23 +34,21 @@ html {
 }
 
 body {
-  width: 370px;
-  min-height: 560px;
-  max-height: 600px;
+  width: 360px;
+  height: 560px;
+  max-height: 560px;
   background-color: var(--bg-main);
   background-image: 
-    linear-gradient(to right, rgba(0, 240, 255, 0.14) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(0, 240, 255, 0.14) 1px, transparent 1px),
-    radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.15) 0%, transparent 80%);
-  background-size: 20px 20px, 20px 20px, 100% 100%;
+    linear-gradient(to right, rgba(168, 85, 247, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(168, 85, 247, 0.12) 1px, transparent 1px);
+  background-size: 14px 14px;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.4;
-  overflow-x: hidden;
-  border: 1px solid #141b29;
-  box-shadow: inset 0 0 0 2px #090B12, inset 0 0 0 3px #00F0FF, inset 0 0 12px rgba(0, 240, 255, 0.35);
-  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--border-dim);
+  box-sizing: border-box;
 }
 
 body::-webkit-scrollbar {
@@ -70,9 +68,11 @@ body::-webkit-scrollbar-thumb:hover {
 .app-container {
   display: flex;
   flex-direction: column;
-  padding: 10px 12px;
-  gap: 9px;
-  position: relative;
+  padding: 8px 10px;
+  gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* ==========================================================================
@@ -444,7 +444,10 @@ body::-webkit-scrollbar-thumb:hover {
 .presets-section {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .section-title-row {
@@ -471,7 +474,8 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  max-height: 250px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 3px;
