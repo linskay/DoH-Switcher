@@ -1,33 +1,33 @@
-# DoH-Switcher // CyberDNS v2.0
+# DoH-Switcher // CyberDNS v2.0.2
 
-Легковесное расширение (Manifest V3) для браузеров Google Chrome и Chromium для управления и переключения между DNS-over-HTTPS (DoH) серверами в один клик с встроенной диагностикой и терминалом событий.
+Легковесное расширение (Manifest V3) для браузеров Google Chrome и Chromium для мгновенного управления и переключения между DNS-over-HTTPS (DoH) серверами в один клик с встроенной RFC 8484 диагностикой и кибер-терминалом событий.
 
 ---
 
-## ⚡ Новые возможности v2.0
+## ⚡ Возможности v2.0
 
 - **Многоэтапный цикл подключения**:
-  - `CONNECTING` — применение политик через Native Host и сброс активных сокетов.
-  - `VERIFYING` — отправка тестового зонда RFC 8484 DNS query к эндпоинту.
-  - `CONNECTED` — подтверждённое рабочее состояние (зелёный индикатор `#00FFA3`).
+  - `CONNECTING` — применение настроек через Native Host и сброс активных сокетов.
+  - `VERIFYING` — отправка единичного тестового DNS-зонда RFC 8484 к выбранному эндпоинту.
+  - `CONNECTED` — подтверждённое рабочее соединение (зелёный индикатор `#00FFA3`).
   - `ERROR` — безопасный откат при сбое применения настроек.
 - **Реальная диагностика DNS (`TEST DNS`)**:
   - Измерение фактического времени ответа (RTT в миллисекундах) через стандарт RFC 8484 `application/dns-message`.
-  - Проверка статуса доступности (`ONLINE` / `OFFLINE` / `TIMEOUT`).
-- **Категории и избранное**:
+  - Проверка статуса доступности (`ONLINE` / `OFFLINE` / `TIMEOUT`) только по клику, без постоянных фоновых запросов.
+- **Избранное и быстрые фильтры**:
   - Закрепление любимых серверов вверху списка (кнопка `★`).
-  - Фильтры по категориям: `ALL`, `★ FAVS`, `PRIVACY`, `SECURITY`, `AD BLOCK`, `CUSTOM`.
-- **Информативные карточки серверов**:
-  - Имя провайдера, DoH URL, теги безопасности (Malware Block, AdBlock, Privacy, Fast).
-  - Реальный пинг и статус доступности.
-  - Кнопка пинга `⚡`, подключения и удаления `[✕]` на каждой карточке.
+  - Лаконичные фильтры: `ALL`, `★ FAVS` (только избранное) и `CUSTOM` (только добавленные вручную).
+- **Информативные киберпанк-карточки серверов**:
+  - Скошенные углы (фаска 45°), тонкие контуры и интерактивный сдвиг при наведении.
+  - Имя провайдера, DoH URL, теги защиты, реальный пинг и статус доступности.
+  - Векторная контурная кнопка теста задержки, быстрое подключение и аккуратная кнопка удаления `[✕]`.
 - **Cyber Terminal & Event Log**:
   - Журнал системных событий в реальном времени (`SWITCH`, `NATIVE_HOST`, `DIAGNOSTICS`, `PROBE`).
   - Экспорт и импорт пользовательских серверов в формате JSON.
-- **Обновлённый Native Host**:
-  - Автоматическая нормализация DoH URL (добавление `{?dns}` для исключения ошибок 415/POST).
-  - Сброс кэша DNS через системный вызов `DnsFlushResolverCache`.
-  - Корректная атомарная запись в `HKLM`, `HKCU` и `Local State`.
+- **Надежный Native Host (C# / Win32)**:
+  - Автоматическая нормализация DoH URL (добавление `{?dns}` для исключения HTTP 415 ошибок).
+  - Моментальный сброс кэша DNS через системный вызов Windows API `DnsFlushResolverCache`.
+  - Атомарная запись в `HKLM`, `HKCU` и `Local State` Chromium.
 
 ---
 
@@ -36,6 +36,7 @@
 | Элемент | Цвет | Код |
 | :--- | :--- | :--- |
 | **Основной фон** | Deep Obsidian | `#090B12` |
+| **Фоновая сетка** | Cyber Purple Grid | `rgba(168, 85, 247, 0.12)` (14×14 px) |
 | **Панели и карточки** | Night City Slate | `#101521` (hover `#141e2b`) |
 | **Основной неон** | Cyber Cyan | `#00F0FF` |
 | **Акцент и действия** | Cyber Yellow | `#FCEE0A` |
@@ -49,49 +50,48 @@
 ## Установка
 
 1. Скачайте исходный код или распакуйте архив релиза.
-2. В Chrome откройте `chrome://extensions/`.
-3. В правом верхнем углу включите **«Режим разработчика»** (*Developer mode*).
-4. Нажмите **«Загрузить распакованное расширение»** (*Load unpacked*).
+2. В Chrome перейдите по адресу: `chrome://extensions/`.
+3. В правом верхнем углу включите переключатель **«Режим разработчика»** (*Developer mode*).
+4. Нажмите кнопку **«Загрузить распакованное расширение»** (*Load unpacked*).
 5. Выберите папку `DoH-Switcher`.
-6. Запустите файл `install-host.bat` для регистрации нативного модуля управления политиками.
+6. Запустите файл **`install-host.bat`** (двойным кликом) для регистрации нативного хоста переключения настроек.
 
 ---
 
 ## Управление системными политиками
 
 ### Активация 1-клик переключения: `install-host.bat`
-Скрипт регистрирует локальный нативный обработчик, позволяющий расширению мгновенно обновлять параметры `DnsOverHttpsMode` и `DnsOverHttpsTemplates` в реестре Windows и файле `Local State` браузера.
+Скрипт в 1 клик регистрирует локальный нативный сервис Native Messaging (`com.doh.switcher`), позволяющий расширению мгновенно обновлять параметры `DnsOverHttpsMode` и `DnsOverHttpsTemplates` в реестре Windows и файле `Local State` браузера без ручных действий.
 
 ### Как убрать плашку «Браузером управляет ваша организация»: `clear-policy.bat`
-В Chromium любое применение политик через реестр Windows сопровождается системной плашкой *«Браузером управляет ваша организация»*. 
-Если вам потребуется полностью очистить системные политики и вернуть Chrome в исходное состояние:
+В браузерах Chromium применение системных политик через реестр Windows сопровождается системной плашкой *«Браузером управляет ваша организация»*. 
+Если вам потребуется полностью очистить ветку политик и вернуть браузер в исходное состояние:
 1. Запустите файл **`clear-policy.bat`** двойным кликом.
-2. Перезапустите Chrome. Плашка управления исчезнет.
+2. Перезапустите Chrome — плашка управления полностью исчезнет.
 
 ---
 
 ## Предустановленные серверы
 
-| Провайдер | Категория | Теги | Шаблон DoH |
+| Провайдер | Назначение | Теги | Шаблон DoH |
 | :--- | :--- | :--- | :--- |
-| **Cloudflare** | Privacy | Fast / No-Logs | `https://chrome.cloudflare-dns.com/dns-query` |
-| **Cloudflare Security** | Security | Malware Block | `https://security.cloudflare-dns.com/dns-query` |
-| **Google Public DNS** | Default | Global Anycast | `https://dns.google/dns-query{?dns}` |
-| **AdGuard DNS** | AdBlock | AdBlocker / Trackers | `https://dns.adguard-dns.com/dns-query{?dns}` |
-| **Quad9** | Security | Threat Intel | `https://dns.quad9.net/dns-query{?dns}` |
-| **Mullvad DNS** | Privacy | Strict No-Logs | `https://dns.mullvad.net/dns-query{?dns}` |
-| **Control D** | Privacy | Uncensored / Free | `https://freedns.controld.com/p0{?dns}` |
+| **Cloudflare** | Приватность | Fast / No-Logs | `https://chrome.cloudflare-dns.com/dns-query` |
+| **Cloudflare Security** | Безопасность | Malware Block | `https://security.cloudflare-dns.com/dns-query` |
+| **Google Public DNS** | Скорость | Global Anycast | `https://dns.google/dns-query{?dns}` |
+| **AdGuard DNS** | Блокировка рекламы | AdBlocker / Trackers | `https://dns.adguard-dns.com/dns-query{?dns}` |
+| **Quad9** | Защита от угроз | Threat Intel | `https://dns.quad9.net/dns-query{?dns}` |
+| **Mullvad DNS** | Строго без логов | Strict No-Logs | `https://dns.mullvad.net/dns-query{?dns}` |
+| **Control D** | Без цензуры | Free / No-Filter | `https://freedns.controld.com/p0{?dns}` |
 
 ---
 
 ## Сборка релиза
 
 ```bash
-npm run package
-# или: node package.js
+node package.js
 ```
 
-Собранный архив сохраняется в директорию `dist/DoH-Switcher-v2.0.0.zip`.
+Собранный архив сохраняется в директорию `dist/DoH-Switcher-v2.0.2.zip`.
 
 ---
 
