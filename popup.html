@@ -4,183 +4,153 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DoH Switcher // CyberDNS v2.0</title>
-  <link rel="stylesheet" href="popup.css?v=2.0.1">
+  <link rel="stylesheet" href="popup.css?v=2.0.2">
 </head>
 <body>
-  <!-- Futuristic Cyberpunk HUD Outer Frame -->
-  <div class="hud-frame">
+  <div class="app-container">
     
-    <!-- Yellow Corner Tick Marks / Brackets -->
-    <div class="corner-bracket top-left"></div>
-    <div class="corner-bracket top-right"></div>
-    <div class="corner-bracket bottom-left"></div>
-    <div class="corner-bracket bottom-right"></div>
-
-    <!-- Top Edge Decal Bar -->
-    <div class="edge-decal top-edge">
-      <span class="decal-item">SEC_PORT: 443</span>
-      <span class="decal-mark">+</span>
-      <span class="decal-item">HUD_CH // 01</span>
-      <span class="decal-mark">+</span>
-      <span class="decal-item">ENC: TLS1.3</span>
-    </div>
-
-    <!-- Inner Hairline Border Wrapper -->
-    <div class="inner-border-wrapper">
-      <div class="app-container">
-        
-        <!-- Top Cyber Header -->
-        <header class="cyber-header">
-          <div class="header-top-row">
-            <div class="brand-left">
-              <span class="brand-glyph">◈</span>
-              <span class="brand-title">DOH // SWITCHER</span>
-            </div>
-            <div class="version-tag">v2.0.1</div>
-          </div>
-          <div class="header-sub-row">
-            <div class="sub-title">CYBERPUNK NETWORK INTERFACE</div>
-          </div>
-          <div class="header-status-bar">
-            <div class="sys-state" id="sysStateIndicator">
-              <span class="state-dot" id="sysStateDot"></span>
-              <span class="state-label" id="sysStateLabel">SYSTEM ONLINE</span>
-            </div>
-            <div class="header-controls">
-              <button id="btnOpenPolicy" class="btn-chip" title="Chrome Enterprise Policies (chrome://policy)">POLICY</button>
-              <button id="btnOpenSettings" class="btn-chip" title="Chrome Security Settings (chrome://settings/security)">SYS</button>
-              <button id="btnToggleTerminal" class="btn-chip chip-accent" title="Open Cyber Terminal / Diagnostics">LOG</button>
-            </div>
-          </div>
-        </header>
-
-        <!-- Master Status HUD -->
-        <section class="master-hud" id="masterHud">
-          <div class="hud-header">
-            <span class="hud-title">// ACTIVE DOH TUNNEL</span>
-            <span class="hud-badge badge-idle" id="connectionBadge">DISCONNECTED</span>
-          </div>
-          <div class="hud-body">
-            <div class="hud-target-name" id="activeDnsName">System Resolver (No Custom DoH)</div>
-            <div class="hud-target-url" id="activeDnsUrl">Default Chromium opportunistic DNS</div>
-          </div>
-          <div class="hud-meta-row">
-            <div class="meta-item">
-              <span class="meta-label">LATENCY:</span>
-              <span class="meta-val" id="activeLatency">-- ms</span>
-            </div>
-            <div class="meta-item">
-              <span class="meta-label">POLICY:</span>
-              <span class="meta-val" id="activePolicyStatus">STANDBY</span>
-            </div>
-            <div class="meta-item">
-              <button id="btnRunDiagnostics" class="btn-hud-action" title="Test Active DoH Endpoint">⚡ TEST DNS</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- Quick Mode Switcher -->
-        <div class="quick-bar">
-          <button id="btnSetAuto" class="btn-mode btn-mode-auto" title="Revert to Chromium Opportunistic Auto DNS">
-            <span>AUTO DEFAULT</span>
-          </button>
-          <button id="btnKillswitch" class="btn-mode btn-mode-kill" title="Completely Disable DoH (Plaintext DNS)">
-            <span>KILLSWITCH</span>
-          </button>
+    <!-- Top Cyber Header -->
+    <header class="cyber-header">
+      <div class="header-top-row">
+        <div class="brand-left">
+          <span class="brand-glyph">◈</span>
+          <span class="brand-title">DOH // SWITCHER</span>
         </div>
-
-        <!-- Filter & Category Tabs -->
-        <div class="filter-tabs" id="filterTabs">
-          <button class="tab-pill active" data-filter="all">ALL</button>
-          <button class="tab-pill" data-filter="favorites">★ FAVS</button>
-          <button class="tab-pill" data-filter="privacy">PRIVACY</button>
-          <button class="tab-pill" data-filter="security">SECURITY</button>
-          <button class="tab-pill" data-filter="adblock">AD BLOCK</button>
-          <button class="tab-pill" data-filter="custom">CUSTOM</button>
-        </div>
-
-        <!-- Presets Section -->
-        <section class="presets-section">
-          <div class="section-title-row">
-            <span class="section-label">// DOH NODES MATRIX</span>
-            <span class="node-counter" id="nodeCounter">7 NODES</span>
-          </div>
-          <div class="presets-list" id="presetsList">
-            <!-- Rendered dynamically -->
-          </div>
-        </section>
-
-        <!-- Inject Custom Node Drawer -->
-        <section class="inject-section">
-          <button id="btnToggleInject" class="inject-toggle-btn">
-            <span id="injectToggleIcon">+</span>
-            <span>INJECT CUSTOM DOH NODE</span>
-          </button>
-
-          <form id="injectForm" class="inject-form hidden" autocomplete="off">
-            <div class="form-row">
-              <label class="form-label" for="inputNodeName">NODE ALIAS</label>
-              <input type="text" id="inputNodeName" class="cyber-input" placeholder="e.g. NextDNS / Pi-hole" maxlength="32" required>
-            </div>
-            <div class="form-row">
-              <label class="form-label" for="inputNodeUrl">DOH TEMPLATE URL</label>
-              <input type="url" id="inputNodeUrl" class="cyber-input" placeholder="https://.../dns-query" required>
-              <div id="urlValidationMsg" class="url-msg">Must start with https://</div>
-            </div>
-            <div class="form-row">
-              <label class="form-label">CATEGORY</label>
-              <select id="inputNodeCategory" class="cyber-select">
-                <option value="custom">CUSTOM</option>
-                <option value="privacy">PRIVACY</option>
-                <option value="security">SECURITY</option>
-                <option value="adblock">AD BLOCK</option>
-              </select>
-            </div>
-            <button type="submit" id="btnSubmitInject" class="btn-cyber-submit" disabled>[ + INJECT PRESET ]</button>
-          </form>
-        </section>
-
-        <!-- Diagnostics / Cyber Terminal Modal -->
-        <div class="terminal-drawer hidden" id="terminalDrawer">
-          <div class="terminal-header">
-            <span class="term-title">// CYBER TERMINAL &amp; DIAGNOSTICS</span>
-            <button id="btnCloseTerminal" class="btn-term-close">✕</button>
-          </div>
-          <div class="terminal-output" id="terminalOutput">
-            <div class="term-line sys">[SYSTEM] Netrunner DNS Controller v2.0 initialized.</div>
-          </div>
-          <div class="terminal-footer">
-            <button id="btnExportJson" class="btn-term-tool">EXPORT JSON</button>
-            <button id="btnImportJson" class="btn-term-tool">IMPORT JSON</button>
-            <button id="btnClearLog" class="btn-term-tool">CLEAR</button>
-          </div>
-          <input type="file" id="fileImportInput" accept=".json" style="display: none;">
-        </div>
-
-        <!-- HUD Toast -->
-        <div id="cyberToast" class="cyber-toast hidden">
-          <span class="toast-marker">◈</span>
-          <span id="toastMsg" class="toast-text">READY</span>
-        </div>
-
-        <!-- Bottom Status Bar -->
-        <footer class="cyber-footer">
-          <span class="footer-meta">ENGINE: NATIVE_POLICY</span>
-          <button id="btnResetDefaults" class="footer-btn">RESTORE FACTORY</button>
-        </footer>
-
+        <div class="version-tag">v2.0.2</div>
       </div>
+      <div class="header-sub-row">
+        <div class="sub-title">CYBERPUNK NETWORK INTERFACE</div>
+      </div>
+      <div class="header-status-bar">
+        <div class="sys-state" id="sysStateIndicator">
+          <span class="state-dot" id="sysStateDot"></span>
+          <span class="state-label" id="sysStateLabel">SYSTEM ONLINE</span>
+        </div>
+        <div class="header-controls">
+          <button id="btnOpenPolicy" class="btn-chip" title="Chrome Enterprise Policies (chrome://policy)">POLICY</button>
+          <button id="btnOpenSettings" class="btn-chip" title="Chrome Security Settings (chrome://settings/security)">SYS</button>
+          <button id="btnToggleTerminal" class="btn-chip chip-accent" title="Open Cyber Terminal / Diagnostics">LOG</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Master Status HUD -->
+    <section class="master-hud" id="masterHud">
+      <div class="hud-header">
+        <span class="hud-title">// ACTIVE DOH TUNNEL</span>
+        <span class="hud-badge badge-idle" id="connectionBadge">DISCONNECTED</span>
+      </div>
+      <div class="hud-body">
+        <div class="hud-target-name" id="activeDnsName">System Resolver (No Custom DoH)</div>
+        <div class="hud-target-url" id="activeDnsUrl">Default Chromium opportunistic DNS</div>
+      </div>
+      <div class="hud-meta-row">
+        <div class="meta-item">
+          <span class="meta-label">LATENCY:</span>
+          <span class="meta-val" id="activeLatency">-- ms</span>
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">POLICY:</span>
+          <span class="meta-val" id="activePolicyStatus">STANDBY</span>
+        </div>
+        <div class="meta-item">
+          <button id="btnRunDiagnostics" class="btn-hud-action" title="Test Active DoH Endpoint">⚡ TEST DNS</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Mode Switcher -->
+    <div class="quick-bar">
+      <button id="btnSetAuto" class="btn-mode btn-mode-auto" title="Revert to Chromium Opportunistic Auto DNS">
+        <span>AUTO DEFAULT</span>
+      </button>
+      <button id="btnKillswitch" class="btn-mode btn-mode-kill" title="Completely Disable DoH (Plaintext DNS)">
+        <span>KILLSWITCH</span>
+      </button>
     </div>
 
-    <!-- Bottom Edge Decal Bar -->
-    <div class="edge-decal bottom-edge">
-      <span class="decal-item">SYS_LOCK // V2.0</span>
-      <span class="decal-mark">+</span>
-      <span class="decal-item">NET_ONLINE</span>
+    <!-- Filter & Category Tabs -->
+    <div class="filter-tabs" id="filterTabs">
+      <button class="tab-pill active" data-filter="all">ALL</button>
+      <button class="tab-pill" data-filter="favorites">★ FAVS</button>
+      <button class="tab-pill" data-filter="privacy">PRIVACY</button>
+      <button class="tab-pill" data-filter="security">SECURITY</button>
+      <button class="tab-pill" data-filter="adblock">AD BLOCK</button>
+      <button class="tab-pill" data-filter="custom">CUSTOM</button>
     </div>
+
+    <!-- Presets Section -->
+    <section class="presets-section">
+      <div class="section-title-row">
+        <span class="section-label">// DOH NODES MATRIX</span>
+        <span class="node-counter" id="nodeCounter">7 NODES</span>
+      </div>
+      <div class="presets-list" id="presetsList">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Inject Custom Node Drawer -->
+    <section class="inject-section">
+      <button id="btnToggleInject" class="inject-toggle-btn">
+        <span id="injectToggleIcon">+</span>
+        <span>INJECT CUSTOM DOH NODE</span>
+      </button>
+
+      <form id="injectForm" class="inject-form hidden" autocomplete="off">
+        <div class="form-row">
+          <label class="form-label" for="inputNodeName">NODE ALIAS</label>
+          <input type="text" id="inputNodeName" class="cyber-input" placeholder="e.g. NextDNS / Pi-hole" maxlength="32" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label" for="inputNodeUrl">DOH TEMPLATE URL</label>
+          <input type="url" id="inputNodeUrl" class="cyber-input" placeholder="https://.../dns-query" required>
+          <div id="urlValidationMsg" class="url-msg">Must start with https://</div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">CATEGORY</label>
+          <select id="inputNodeCategory" class="cyber-select">
+            <option value="custom">CUSTOM</option>
+            <option value="privacy">PRIVACY</option>
+            <option value="security">SECURITY</option>
+            <option value="adblock">AD BLOCK</option>
+          </select>
+        </div>
+        <button type="submit" id="btnSubmitInject" class="btn-cyber-submit" disabled>[ + INJECT PRESET ]</button>
+      </form>
+    </section>
+
+    <!-- Diagnostics / Cyber Terminal Modal -->
+    <div class="terminal-drawer hidden" id="terminalDrawer">
+      <div class="terminal-header">
+        <span class="term-title">// CYBER TERMINAL &amp; DIAGNOSTICS</span>
+        <button id="btnCloseTerminal" class="btn-term-close">✕</button>
+      </div>
+      <div class="terminal-output" id="terminalOutput">
+        <div class="term-line sys">[SYSTEM] Netrunner DNS Controller v2.0 initialized.</div>
+      </div>
+      <div class="terminal-footer">
+        <button id="btnExportJson" class="btn-term-tool">EXPORT JSON</button>
+        <button id="btnImportJson" class="btn-term-tool">IMPORT JSON</button>
+        <button id="btnClearLog" class="btn-term-tool">CLEAR</button>
+      </div>
+      <input type="file" id="fileImportInput" accept=".json" style="display: none;">
+    </div>
+
+    <!-- HUD Toast -->
+    <div id="cyberToast" class="cyber-toast hidden">
+      <span class="toast-marker">◈</span>
+      <span id="toastMsg" class="toast-text">READY</span>
+    </div>
+
+    <!-- Bottom Status Bar -->
+    <footer class="cyber-footer">
+      <span class="footer-meta">ENGINE: NATIVE_POLICY</span>
+      <button id="btnResetDefaults" class="footer-btn">RESTORE FACTORY</button>
+    </footer>
 
   </div>
 
-  <script src="popup.js?v=2.0.1"></script>
+  <script src="popup.js?v=2.0.2"></script>
 </body>
 </html>
