@@ -1009,6 +1009,18 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 8.5px;
 }
 
+.footer-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.footer-link:hover {
+  color: var(--neon-primary);
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.4);
+}
+
 .footer-meta {
   color: var(--text-secondary);
 }
@@ -1020,7 +1032,7 @@ body::-webkit-scrollbar-thumb:hover {
   font-family: var(--font-mono);
   font-size: 8.5px;
   cursor: pointer;
-  text-decoration: underline;
+  transition: color 0.15s ease;
 }
 
 .footer-btn:hover {

@@ -162,6 +162,13 @@ function setupEventListeners() {
   btnSetAuto.addEventListener('click', handleSetAuto);
   btnKillswitch.addEventListener('click', handleKillswitch);
   btnResetDefaults.addEventListener('click', handleResetDefaults);
+  const linkGithub = document.getElementById('linkGithub');
+  if (linkGithub) {
+    linkGithub.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: 'https://github.com/linskay/DoH-Switcher' });
+    });
+  }
 
   btnOpenSettings.addEventListener('click', () => {
     chrome.tabs.create({ url: 'chrome://settings/security' });
