@@ -321,6 +321,9 @@ function renderPresetsList() {
     });
     actions.appendChild(btnDel);
 
+    // Append actions container to card
+    card.appendChild(actions);
+
     // Clicking card activates it
     card.addEventListener('click', () => {
       if (!isThisActive) {
