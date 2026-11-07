@@ -28,6 +28,9 @@ const filesToCopy = [
   'popup.html',
   'popup.css',
   'popup.js',
+  'doh-host.exe',
+  'com.doh.switcher.json',
+  'install-host.bat',
   'README.md',
   'LICENSE'
 ];

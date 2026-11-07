@@ -1,6 +1,6 @@
 /**
  * DoH-Switcher // CyberDNS - Background Service Worker
- * Manages badge status and reflects Chrome secure DNS state
+ * Manages badge status synchronized with persistent storage
  */
 
 function updateBadge(mode) {
@@ -13,17 +13,18 @@ function updateBadge(mode) {
       }
     } else if (mode === 'automatic') {
       chrome.action.setBadgeText({ text: 'AUTO' });
-      chrome.action.setBadgeBackgroundColor({ color: '#3A3D4D' }); // Muted Steel
+      chrome.action.setBadgeBackgroundColor({ color: '#3A3D4D' }); // Steel Gray
       if (chrome.action.setBadgeTextColor) {
         chrome.action.setBadgeTextColor({ color: '#E0E0E0' });
       }
-    } else {
-      // mode === 'off' or unknown
+    } else if (mode === 'off') {
       chrome.action.setBadgeText({ text: 'OFF' });
       chrome.action.setBadgeBackgroundColor({ color: '#FF003C' }); // Cyber Red
       if (chrome.action.setBadgeTextColor) {
         chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
       }
+    } else {
+      chrome.action.setBadgeText({ text: '' });
     }
   } catch (err) {
     console.error('[DoH-Switcher] Failed to update badge:', err);
@@ -31,18 +32,13 @@ function updateBadge(mode) {
 }
 
 function syncCurrentStatus() {
-  if (chrome.privacy && chrome.privacy.services && chrome.privacy.services.secureDnsMode) {
-    chrome.privacy.services.secureDnsMode.get({}, (details) => {
-      if (chrome.runtime.lastError) {
-        console.warn('[DoH-Switcher] Privacy API warning:', chrome.runtime.lastError.message);
-        return;
-      }
-      updateBadge(details.value);
-    });
-  }
+  chrome.storage.local.get(['activeMode'], (res) => {
+    const mode = res.activeMode || 'automatic';
+    updateBadge(mode);
+  });
 }
 
-// Listen for browser lifecycle events
+// Lifecycle listeners
 chrome.runtime.onInstalled.addListener(() => {
   syncCurrentStatus();
 });
@@ -51,14 +47,14 @@ chrome.runtime.onStartup.addListener(() => {
   syncCurrentStatus();
 });
 
-// Listen to setting changes triggered anywhere in browser
-if (chrome.privacy && chrome.privacy.services && chrome.privacy.services.secureDnsMode) {
-  chrome.privacy.services.secureDnsMode.onChange.addListener((details) => {
-    updateBadge(details.value);
-  });
-}
+// React whenever activeMode changes in storage
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.activeMode) {
+    updateBadge(changes.activeMode.newValue);
+  }
+});
 
-// Listen to messages from popup
+// Direct message listener from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.type === 'REFRESH_STATUS') {
     syncCurrentStatus();

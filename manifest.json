@@ -5,9 +5,10 @@
   "description": "Cyberpunk-styled instant DNS-over-HTTPS (DoH) switcher for Chromium browsers.",
   "author": "linskay",
   "homepage_url": "https://github.com/linskay/DoH-Switcher",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwVTSGEsYndfBPVdD7duNuChm8ZqAXnQkG3Dp2MHmzwuKYsk/oahFueB9fmMoTHIWK+xcnicJUX/QVQhHZUMV285pbqUrFgLIPR+CwGIS07VdNddyr59rBPijKF3zspnu2kYUNtz+xTfD3IuXtPq2lZ/8gVwHg9dLpbVJtNVanjqrXyX1NFrHES03JX7vS6r2JpzgiptYroC1+ec++d1R9T0mwxHUHvG9KxuJWAO4A76b6hWauV0MPeUG36cBFEad1gOHF4dHzrcqPTI/RtpSUQU6xz/C1wDRZs2QYkN0VrjtQB6Xc1H3ZA1NxmPAuxHisD4q7PR9GkWPs92tX8OmRwIDAQAB",
   "permissions": [
-    "privacy",
-    "storage"
+    "storage",
+    "nativeMessaging"
   ],
   "action": {
     "default_popup": "popup.html",

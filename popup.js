@@ -34,7 +34,7 @@ const DEFAULT_PRESETS = [
   },
   {
     id: "quad9-sec",
-    name: "Quad9 (Malware Block)",
+    name: "Quad9 (Threat Block)",
     url: "https://dns.quad9.net/dns-query",
     tag: "Security",
     isDefault: true
@@ -57,9 +57,10 @@ const DEFAULT_PRESETS = [
 
 // App State
 let currentPresets = [];
-let currentDnsMode = 'unknown'; // 'secure' | 'automatic' | 'off'
+let currentDnsMode = 'automatic'; // 'secure' | 'automatic' | 'off'
 let currentTemplate = '';
-let isControlledByPolicy = false;
+let activePresetId = '';
+let hasNativeHost = false;
 let toastTimeout = null;
 
 // DOM Elements
@@ -92,8 +93,10 @@ const toastMsg = document.getElementById('toastMsg');
  */
 document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
-  await loadPresets();
-  await refreshCurrentState();
+  await loadStateAndPresets();
+  renderPresetsList();
+  updateHudUI(currentDnsMode, currentTemplate);
+  checkNativeHost();
 });
 
 /**
@@ -126,24 +129,31 @@ function setupEventListeners() {
 }
 
 /**
- * Load presets from chrome.storage.local
+ * Load Presets and Active State from chrome.storage.local
  */
-function loadPresets() {
+function loadStateAndPresets() {
   return new Promise((resolve) => {
-    chrome.storage.local.get(['presets'], (result) => {
-      if (result.presets && Array.isArray(result.presets) && result.presets.length > 0) {
-        currentPresets = result.presets;
+    chrome.storage.local.get(['presets', 'activeMode', 'activeTemplate', 'activePresetId'], (res) => {
+      // 1. Presets list
+      if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
+        currentPresets = res.presets;
       } else {
         currentPresets = [...DEFAULT_PRESETS];
         chrome.storage.local.set({ presets: currentPresets });
       }
-      resolve(currentPresets);
+
+      // 2. Active DNS State
+      currentDnsMode = res.activeMode || 'automatic';
+      currentTemplate = res.activeTemplate || '';
+      activePresetId = res.activePresetId || '';
+
+      resolve();
     });
   });
 }
 
 /**
- * Save presets to chrome.storage.local
+ * Save presets to storage
  */
 function savePresets() {
   return new Promise((resolve) => {
@@ -154,73 +164,77 @@ function savePresets() {
 }
 
 /**
- * Read current Chromium Secure DNS state via chrome.privacy
+ * Save active state to storage
  */
-function refreshCurrentState() {
-  return new Promise((resolve) => {
-    if (!chrome.privacy || !chrome.privacy.services || !chrome.privacy.services.secureDnsMode) {
-      updateHudUI('unknown', '', false);
-      resolve();
-      return;
-    }
+function saveActiveState(mode, template, presetId) {
+  currentDnsMode = mode;
+  currentTemplate = template;
+  activePresetId = presetId || '';
 
-    chrome.privacy.services.secureDnsMode.get({}, (modeDetails) => {
-      if (chrome.runtime.lastError) {
-        console.warn('Failed to query secureDnsMode:', chrome.runtime.lastError.message);
-      }
-      currentDnsMode = modeDetails ? modeDetails.value : 'unknown';
-      const levelOfControl = modeDetails ? modeDetails.levelOfControl : '';
-      isControlledByPolicy = (levelOfControl === 'not_controllable' || levelOfControl === 'controlled_by_other_extension');
-
-      chrome.privacy.services.secureDnsTemplates.get({}, (templateDetails) => {
-        if (chrome.runtime.lastError) {
-          console.warn('Failed to query secureDnsTemplates:', chrome.runtime.lastError.message);
-        }
-        currentTemplate = (templateDetails && templateDetails.value) ? templateDetails.value.trim() : '';
-        
-        updateHudUI(currentDnsMode, currentTemplate, isControlledByPolicy);
-        renderPresetsList();
-        notifyBackgroundBadge();
-        resolve();
-      });
-    });
+  chrome.storage.local.set({
+    activeMode: mode,
+    activeTemplate: template,
+    activePresetId: activePresetId
   });
+}
+
+/**
+ * Check if the Native Policy Host is installed and responsive
+ */
+function checkNativeHost() {
+  try {
+    chrome.runtime.sendNativeMessage('com.doh.switcher', { action: 'PING' }, (response) => {
+      if (chrome.runtime.lastError) {
+        hasNativeHost = false;
+        console.info('[DoH-Switcher] Native Host not connected yet. Run install-host.bat for 1-click system policy sync.');
+      } else if (response && response.success) {
+        hasNativeHost = true;
+      }
+    });
+  } catch (e) {
+    hasNativeHost = false;
+  }
 }
 
 /**
  * Update Master HUD UI based on mode and active template
  */
-function updateHudUI(mode, template, isLocked) {
+function updateHudUI(mode, template) {
   hudStatusCard.classList.remove('mode-secure', 'mode-automatic', 'mode-off');
-  policyWarning.style.display = isLocked ? 'block' : 'none';
 
   if (mode === 'secure') {
     hudStatusCard.classList.add('mode-secure');
     statusText.textContent = 'SECURE (ENCRYPTED)';
 
     // Find if matches any known preset
-    const matched = currentPresets.find(p => p.url.trim().toLowerCase() === template.toLowerCase());
+    const matched = currentPresets.find(p => 
+      (activePresetId && p.id === activePresetId) ||
+      (template && p.url.trim().toLowerCase() === template.trim().toLowerCase())
+    );
+
     if (matched) {
       activeServerName.textContent = matched.name;
+      activeServerUrl.textContent = matched.url;
     } else if (template) {
       activeServerName.textContent = 'Custom DoH Endpoint';
+      activeServerUrl.textContent = template;
     } else {
-      activeServerName.textContent = 'Secure DNS (No Template)';
+      activeServerName.textContent = 'Secure DNS';
+      activeServerUrl.textContent = 'https://...';
     }
-    activeServerUrl.textContent = template || 'https://...';
   } else if (mode === 'automatic') {
     hudStatusCard.classList.add('mode-automatic');
     statusText.textContent = 'AUTOMATIC (SYSTEM)';
     activeServerName.textContent = 'Opportunistic Chromium Resolver';
-    activeServerUrl.textContent = 'OS System DNS (Upgrades to DoH if supported)';
+    activeServerUrl.textContent = 'System DNS (Upgrades to DoH if supported)';
   } else if (mode === 'off') {
     hudStatusCard.classList.add('mode-off');
     statusText.textContent = 'DISABLED (OFF)';
     activeServerName.textContent = 'Unencrypted Plaintext DNS';
     activeServerUrl.textContent = 'Direct System Resolution (DoH Inactive)';
   } else {
-    statusText.textContent = 'STATUS UNKNOWN';
-    activeServerName.textContent = 'Cannot read Chromium settings';
+    statusText.textContent = 'READY';
+    activeServerName.textContent = 'Select a DoH Server';
     activeServerUrl.textContent = '--';
   }
 }
@@ -234,7 +248,8 @@ function renderPresetsList() {
 
   currentPresets.forEach((preset) => {
     const isThisActive = (currentDnsMode === 'secure') && 
-      (currentTemplate.toLowerCase() === preset.url.trim().toLowerCase());
+      ((activePresetId && preset.id === activePresetId) ||
+       (currentTemplate && currentTemplate.toLowerCase() === preset.url.trim().toLowerCase()));
 
     const card = document.createElement('div');
     card.className = `preset-card ${isThisActive ? 'is-active' : ''}`;
@@ -267,7 +282,7 @@ function renderPresetsList() {
     info.appendChild(urlSpan);
     card.appendChild(info);
 
-    // Right action
+    // Right actions
     const actions = document.createElement('div');
     actions.className = 'preset-actions';
 
@@ -287,11 +302,11 @@ function renderPresetsList() {
       actions.appendChild(btnConnect);
     }
 
-    // Delete button (allowed for all custom, and default ones if requested)
+    // Delete button (allowed for custom presets)
     if (!preset.isDefault) {
       const btnDel = document.createElement('button');
       btnDel.className = 'btn-delete';
-      btnDel.innerHTML = '&#x2715;'; // Cross icon
+      btnDel.innerHTML = '&#x2715;'; // Cross
       btnDel.title = 'Delete custom node';
       btnDel.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -300,7 +315,7 @@ function renderPresetsList() {
       actions.appendChild(btnDel);
     }
 
-    // Clicking card activates it if not already active
+    // Clicking card activates it
     card.addEventListener('click', () => {
       if (!isThisActive) {
         activatePreset(preset);
@@ -312,82 +327,82 @@ function renderPresetsList() {
 }
 
 /**
- * Activate a DoH preset in Chrome
+ * Copy text to clipboard safely
+ */
+function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).catch(() => {});
+  }
+}
+
+/**
+ * Activate a DoH preset
  */
 function activatePreset(preset) {
-  if (isControlledByPolicy) {
-    showToast('SYS ERROR: Overridden by OS/Group Policy!');
-    return;
-  }
+  saveActiveState('secure', preset.url, preset.id);
+  updateHudUI('secure', preset.url);
+  renderPresetsList();
+  copyToClipboard(preset.url);
 
-  // 1. Set Template URL
-  chrome.privacy.services.secureDnsTemplates.set({ value: preset.url }, () => {
-    if (chrome.runtime.lastError) {
-      console.error('Error setting secureDnsTemplates:', chrome.runtime.lastError.message);
-      showToast('ERROR: ' + chrome.runtime.lastError.message);
-      return;
-    }
-
-    // 2. Set Mode to 'secure'
-    chrome.privacy.services.secureDnsMode.set({ value: 'secure' }, () => {
-      if (chrome.runtime.lastError) {
-        console.error('Error setting secureDnsMode:', chrome.runtime.lastError.message);
-        showToast('ERROR: ' + chrome.runtime.lastError.message);
-        return;
+  // Send to Native Messaging Host for instant Windows Policy application
+  try {
+    chrome.runtime.sendNativeMessage(
+      'com.doh.switcher',
+      { action: 'SET_DOH', mode: 'secure', template: preset.url },
+      (response) => {
+        if (!chrome.runtime.lastError && response && response.success) {
+          showToast(`POLICY ENFORCED // ${preset.name}`);
+        } else {
+          // Native host not installed yet: notify user
+          showToast(`COPIED // ${preset.name}`);
+        }
       }
-
-      currentDnsMode = 'secure';
-      currentTemplate = preset.url;
-      updateHudUI(currentDnsMode, currentTemplate, isControlledByPolicy);
-      renderPresetsList();
-      notifyBackgroundBadge();
-      showToast(`CONNECTED // ${preset.name}`);
-    });
-  });
+    );
+  } catch (err) {
+    showToast(`ACTIVE // ${preset.name}`);
+  }
 }
 
 /**
- * Switch back to Automatic Opportunistic Mode
+ * Switch back to Automatic Mode
  */
 function handleSetAuto() {
-  if (isControlledByPolicy) {
-    showToast('SYS ERROR: Locked by OS/Group Policy');
-    return;
-  }
+  saveActiveState('automatic', '', '');
+  updateHudUI('automatic', '');
+  renderPresetsList();
 
-  chrome.privacy.services.secureDnsMode.set({ value: 'automatic' }, () => {
-    if (chrome.runtime.lastError) {
-      showToast('ERROR: ' + chrome.runtime.lastError.message);
-      return;
-    }
-    currentDnsMode = 'automatic';
-    updateHudUI(currentDnsMode, currentTemplate, isControlledByPolicy);
-    renderPresetsList();
-    notifyBackgroundBadge();
-    showToast('MODE // REVERTED TO SYSTEM AUTO');
-  });
+  try {
+    chrome.runtime.sendNativeMessage(
+      'com.doh.switcher',
+      { action: 'SET_DOH', mode: 'automatic', template: '' },
+      () => {
+        if (chrome.runtime.lastError) {}
+      }
+    );
+  } catch (err) {}
+
+  showToast('MODE // REVERTED TO SYSTEM AUTO');
 }
 
 /**
- * Killswitch: Disable DoH completely (off)
+ * Killswitch: Disable DoH completely
  */
 function handleKillswitch() {
-  if (isControlledByPolicy) {
-    showToast('SYS ERROR: Locked by OS/Group Policy');
-    return;
-  }
+  saveActiveState('off', '', '');
+  updateHudUI('off', '');
+  renderPresetsList();
 
-  chrome.privacy.services.secureDnsMode.set({ value: 'off' }, () => {
-    if (chrome.runtime.lastError) {
-      showToast('ERROR: ' + chrome.runtime.lastError.message);
-      return;
-    }
-    currentDnsMode = 'off';
-    updateHudUI(currentDnsMode, currentTemplate, isControlledByPolicy);
-    renderPresetsList();
-    notifyBackgroundBadge();
-    showToast('KILLSWITCH // SECURE DNS TERMINATED');
-  });
+  try {
+    chrome.runtime.sendNativeMessage(
+      'com.doh.switcher',
+      { action: 'SET_DOH', mode: 'off', template: '' },
+      () => {
+        if (chrome.runtime.lastError) {}
+      }
+    );
+  } catch (err) {}
+
+  showToast('KILLSWITCH // SECURE DNS TERMINATED');
 }
 
 /**
@@ -471,7 +486,8 @@ async function handleInjectSubmit(e) {
   injectForm.classList.add('hidden');
   injectToggleIcon.textContent = '+';
 
-  // Automatically activate the newly added preset!
+  // Immediately render list & activate
+  renderPresetsList();
   activatePreset(newPreset);
   showToast(`NODE INJECTED // ${newPreset.name}`);
 }
@@ -494,20 +510,6 @@ async function handleResetDefaults() {
   await savePresets();
   renderPresetsList();
   showToast('MATRIX RESTORED TO FACTORY PRESETS');
-}
-
-/**
- * Notify background worker to refresh badge
- */
-function notifyBackgroundBadge() {
-  if (chrome.runtime && chrome.runtime.sendMessage) {
-    chrome.runtime.sendMessage({ type: 'REFRESH_STATUS' }, () => {
-      // Suppress potential unhandled response warning if background is idle
-      if (chrome.runtime.lastError) {
-        // Ignored safely
-      }
-    });
-  }
 }
 
 /**

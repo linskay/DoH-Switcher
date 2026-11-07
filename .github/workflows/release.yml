@@ -24,7 +24,7 @@ jobs:
       - name: Build extension zip
         run: |
           mkdir -p dist/stage/icons
-          cp manifest.json background.js popup.html popup.css popup.js README.md LICENSE dist/stage/
+          cp manifest.json background.js popup.html popup.css popup.js doh-host.exe com.doh.switcher.json install-host.bat README.md LICENSE dist/stage/ 2>/dev/null || cp manifest.json background.js popup.html popup.css popup.js README.md LICENSE dist/stage/
           cp -r icons/* dist/stage/icons/
           cd dist/stage
           zip -r ../DoH-Switcher-v1.0.0.zip .

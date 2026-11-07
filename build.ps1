@@ -24,7 +24,7 @@ if (Test-Path $stageDir) {
 }
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
-$files = @("manifest.json", "background.js", "popup.html", "popup.css", "popup.js", "README.md", "LICENSE")
+$files = @("manifest.json", "background.js", "popup.html", "popup.css", "popup.js", "doh-host.exe", "com.doh.switcher.json", "install-host.bat", "README.md", "LICENSE")
 foreach ($f in $files) {
     $src = Join-Path $rootDir $f
     if (Test-Path $src) {
