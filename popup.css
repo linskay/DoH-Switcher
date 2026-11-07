@@ -200,8 +200,8 @@ body {
 }
 
 .master-hud.hud-connected {
-  border-color: var(--neon-success);
-  box-shadow: inset 2px 0 var(--neon-success), 0 0 10px rgba(0, 255, 163, 0.15);
+  border-color: rgba(0, 255, 163, 0.55);
+  box-shadow: 0 0 6px rgba(0, 255, 163, 0.12);
 }
 
 .master-hud.hud-connecting {
@@ -237,10 +237,9 @@ body {
 }
 
 .badge-connected {
-  background: rgba(0, 255, 163, 0.15);
-  border: 1px solid var(--neon-success);
+  background: rgba(0, 255, 163, 0.1);
+  border: 1px solid rgba(0, 255, 163, 0.45);
   color: var(--neon-success);
-  text-shadow: 0 0 6px rgba(0, 255, 163, 0.4);
 }
 
 .badge-connecting {
@@ -687,24 +686,28 @@ body {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  background: rgba(255, 49, 88, 0.12) !important;
-  border: 1px solid rgba(255, 49, 88, 0.35) !important;
-  color: var(--neon-error) !important;
+  width: 17px;
+  height: 17px;
+  background: transparent !important;
+  border: 1px solid rgba(255, 49, 88, 0.25) !important;
+  color: rgba(255, 49, 88, 0.6) !important;
   cursor: pointer;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1;
   border-radius: 2px;
   flex-shrink: 0;
+  padding: 0;
   transition: all 0.15s ease;
 }
 
 .btn-delete:hover {
-  background: var(--neon-error) !important;
-  color: #000 !important;
-  box-shadow: 0 0 6px var(--neon-error);
+  background: rgba(255, 49, 88, 0.15) !important;
+  border-color: var(--neon-error) !important;
+  color: var(--neon-error) !important;
+  box-shadow: 0 0 6px rgba(255, 49, 88, 0.35);
+}
+
+.btn-delete svg {
+  display: block;
+  pointer-events: none;
 }
 
 /* ==========================================================================

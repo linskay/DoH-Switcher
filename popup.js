@@ -463,7 +463,7 @@ function renderPresetsList() {
     // Delete Cross Button (available for all presets)
     const btnDel = document.createElement('button');
     btnDel.className = 'btn-delete';
-    btnDel.textContent = '✕';
+    btnDel.innerHTML = '<svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="1.5" y1="1.5" x2="8.5" y2="8.5"/><line x1="8.5" y1="1.5" x2="1.5" y2="8.5"/></svg>';
     btnDel.title = 'Delete node';
     btnDel.setAttribute('aria-label', 'Delete node');
     btnDel.addEventListener('click', (e) => {
