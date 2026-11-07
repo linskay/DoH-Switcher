@@ -120,7 +120,6 @@ const btnOpenSettings = document.getElementById('btnOpenSettings');
 const btnOpenPolicy = document.getElementById('btnOpenPolicy');
 const btnResetDefaults = document.getElementById('btnResetDefaults');
 
-const filterTabs = document.getElementById('filterTabs');
 const presetsList = document.getElementById('presetsList');
 const nodeCounter = document.getElementById('nodeCounter');
 
@@ -189,16 +188,6 @@ function setupEventListeners() {
   btnExportJson.addEventListener('click', exportPresetsJson);
   btnImportJson.addEventListener('click', () => fileImportInput.click());
   fileImportInput.addEventListener('change', importPresetsJson);
-
-  // Filter Tabs
-  filterTabs.addEventListener('click', (e) => {
-    const tab = e.target.closest('.tab-pill');
-    if (!tab) return;
-    document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    currentFilter = tab.getAttribute('data-filter') || 'all';
-    renderPresetsList();
-  });
 
   // Inject Form
   btnToggleInject.addEventListener('click', () => {
