@@ -196,6 +196,19 @@ function setupEventListeners() {
   btnImportJson.addEventListener('click', () => fileImportInput.click());
   fileImportInput.addEventListener('change', importPresetsJson);
 
+  // Filter Tabs (ALL, FAVS, CUSTOM)
+  const filterTabs = document.getElementById('filterTabs');
+  if (filterTabs) {
+    filterTabs.addEventListener('click', (e) => {
+      const tab = e.target.closest('.tab-pill');
+      if (!tab) return;
+      document.querySelectorAll('.tab-pill').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentFilter = tab.getAttribute('data-filter') || 'all';
+      renderPresetsList();
+    });
+  }
+
   // Inject Form
   btnToggleInject.addEventListener('click', () => {
     const isHidden = injectForm.classList.contains('hidden');
