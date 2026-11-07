@@ -30,23 +30,131 @@
 }
 
 body {
-  width: 370px;
-  min-height: 560px;
-  max-height: 600px;
-  background-color: var(--bg-main);
+  width: 374px;
+  min-height: 570px;
+  max-height: 620px;
+  background-color: #030407;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
   line-height: 1.4;
   overflow-x: hidden;
-  border: 1px solid var(--border-dim);
+  padding: 4px;
+}
+
+/* ==========================================================================
+   Cyberpunk HUD Outer Frame (Chamfered Octagon + Cyan Border + Corner Brackets)
+   ========================================================================== */
+
+.hud-frame {
+  position: relative;
+  background-color: var(--bg-main);
+  border: 2px solid var(--neon-primary);
+  box-shadow: 0 0 14px rgba(0, 240, 255, 0.4), inset 0 0 12px rgba(0, 240, 255, 0.08);
+  clip-path: polygon(
+    14px 0, 
+    calc(100% - 14px) 0, 
+    100% 14px, 
+    100% calc(100% - 14px), 
+    calc(100% - 14px) 100%, 
+    14px 100%, 
+    0 calc(100% - 14px), 
+    0 14px
+  );
+  display: flex;
+  flex-direction: column;
+}
+
+/* Yellow Corner Tick Marks / Brackets */
+.corner-bracket {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.corner-bracket.top-left {
+  top: 0;
+  left: 0;
+  border-top: 3.5px solid var(--neon-accent);
+  border-left: 3.5px solid var(--neon-accent);
+  box-shadow: 0 0 8px rgba(252, 238, 10, 0.7);
+}
+
+.corner-bracket.top-right {
+  top: 0;
+  right: 0;
+  border-top: 3.5px solid var(--neon-accent);
+  border-right: 3.5px solid var(--neon-accent);
+  box-shadow: 0 0 8px rgba(252, 238, 10, 0.7);
+}
+
+.corner-bracket.bottom-left {
+  bottom: 0;
+  left: 0;
+  border-bottom: 3.5px solid var(--neon-accent);
+  border-left: 3.5px solid var(--neon-accent);
+  box-shadow: 0 0 8px rgba(252, 238, 10, 0.7);
+}
+
+.corner-bracket.bottom-right {
+  bottom: 0;
+  right: 0;
+  border-bottom: 3.5px solid var(--neon-accent);
+  border-right: 3.5px solid var(--neon-accent);
+  box-shadow: 0 0 8px rgba(252, 238, 10, 0.7);
+}
+
+/* Edge Decals / Technical Telemetry */
+.edge-decal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 18px;
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 1px;
+  line-height: 1;
+  pointer-events: none;
+  background: rgba(0, 240, 255, 0.04);
+}
+
+.top-edge {
+  border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.bottom-edge {
+  border-top: 1px solid rgba(0, 240, 255, 0.15);
+}
+
+.decal-mark {
+  color: var(--neon-accent);
+  font-weight: 900;
+  font-size: 8.5px;
+  text-shadow: 0 0 4px rgba(252, 238, 10, 0.6);
+}
+
+.decal-item {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* Inner Hairline Technical Border */
+.inner-border-wrapper {
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  margin: 3px 5px;
+  border-radius: 2px;
+  background: rgba(16, 21, 33, 0.35);
+  display: flex;
+  flex-direction: column;
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
-  padding: 10px 12px;
-  gap: 9px;
+  padding: 8px 10px;
+  gap: 8px;
   position: relative;
 }
 
