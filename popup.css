@@ -38,6 +38,11 @@ body {
   min-height: 560px;
   max-height: 600px;
   background-color: var(--bg-main);
+  background-image: 
+    linear-gradient(rgba(0, 240, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.045) 1px, transparent 1px),
+    radial-gradient(ellipse at 50% 0%, rgba(0, 240, 255, 0.08) 0%, transparent 65%);
+  background-size: 20px 20px, 20px 20px, 100% 100%;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 13px;
