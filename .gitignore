@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist/
+*.zip
+
+# Node
+node_modules/
+package-lock.json
+
+# Scratch & IDE
+.vscode/
+.idea/
+*.log

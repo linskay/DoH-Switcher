@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DoH Switcher // CyberDNS</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="cyber-scanlines"></div>
+  <div class="container">
+    
+    <!-- Top Cyber Header -->
+    <header class="cyber-header">
+      <div class="header-left">
+        <div class="logo-box">
+          <img src="icons/icon-32.png" alt="CyberDNS Logo" class="header-icon">
+        </div>
+        <div class="title-meta">
+          <div class="brand-title">DOH // SWITCHER</div>
+          <div class="brand-sub">CYBERPUNK DNS TUNNEL <span class="tag-ver">v1.0</span></div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btnOpenSettings" class="cyber-btn-mini" title="Open Chrome Security Settings">
+          <span>SYS</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Master HUD Status Card -->
+    <section class="hud-status-card" id="hudStatusCard">
+      <div class="hud-top-row">
+        <div class="hud-label">// SYS_SECURITY_STATUS</div>
+        <div class="hud-badge-container">
+          <span class="hud-pill" id="statusPill">
+            <span class="pulse-indicator" id="pulseDot"></span>
+            <span id="statusText">CHECKING...</span>
+          </span>
+        </div>
+      </div>
+      <div class="hud-active-target">
+        <div class="target-title" id="activeServerName">Resolving...</div>
+        <div class="target-url" id="activeServerUrl">--</div>
+      </div>
+      <div class="policy-warning" id="policyWarning" style="display: none;">
+        <span>⚠ CONTROLLED BY OS / GROUP POLICY</span>
+      </div>
+    </section>
+
+    <!-- Quick Control Bar -->
+    <div class="quick-controls">
+      <button id="btnSetAuto" class="btn-quick btn-auto" title="Revert to Chromium Opportunistic Auto DNS">
+        <span class="btn-corner"></span>
+        <span class="btn-text">AUTO DEFAULT</span>
+      </button>
+      <button id="btnKillswitch" class="btn-quick btn-kill" title="Completely Disable DoH (Clear Templates)">
+        <span class="btn-corner"></span>
+        <span class="btn-text">KILLSWITCH</span>
+      </button>
+    </div>
+
+    <!-- Presets Section -->
+    <section class="presets-section">
+      <div class="section-header">
+        <span class="section-title">// DOH NODES MATRIX</span>
+        <span class="count-badge" id="nodesCount">0 NODES</span>
+      </div>
+      
+      <div class="presets-list" id="presetsList">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Add Custom Node Toggle & Form -->
+    <section class="injector-section">
+      <button id="btnToggleInject" class="inject-toggle-btn">
+        <span class="toggle-icon" id="injectToggleIcon">+</span>
+        <span>INJECT CUSTOM DOH NODE</span>
+      </button>
+
+      <form id="injectForm" class="inject-form hidden" autocomplete="off">
+        <div class="form-group">
+          <label for="inputNodeName" class="form-label">NODE ALIAS</label>
+          <input type="text" id="inputNodeName" class="cyber-input" placeholder="e.g. NextDNS / Pi-hole" maxlength="30" required>
+        </div>
+        <div class="form-group">
+          <label for="inputNodeUrl" class="form-label">DOH TEMPLATE URL</label>
+          <input type="url" id="inputNodeUrl" class="cyber-input" placeholder="https://.../dns-query" required>
+          <div id="urlValidationMsg" class="validation-msg">Must start with https://</div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" id="btnSubmitInject" class="cyber-btn-accent" disabled>
+            <span>[ + INJECT PRESET ]</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Cyberpunk Notification Toast -->
+    <div id="cyberToast" class="cyber-toast hidden">
+      <span class="toast-prefix">//</span>
+      <span id="toastMsg" class="toast-content">READY</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="cyber-footer">
+      <a href="https://github.com/linskay/DoH-Switcher" target="_blank" class="footer-link">GITHUB: linskay/DoH-Switcher</a>
+      <button id="btnResetDefaults" class="btn-link" title="Restore factory preset servers">RESTORE DEFAULTS</button>
+    </footer>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

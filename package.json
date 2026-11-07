@@ -1,0 +1,26 @@
+{
+  "name": "doh-switcher",
+  "version": "1.0.0",
+  "description": "Cyberpunk 2077 styled 1-click DoH DNS Switcher for Google Chrome & Chromium browsers",
+  "main": "background.js",
+  "scripts": {
+    "package": "node package.js",
+    "build:zip": "powershell -ExecutionPolicy Bypass -File build.ps1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/linskay/DoH-Switcher.git"
+  },
+  "keywords": [
+    "chrome-extension",
+    "dns-over-https",
+    "doh",
+    "cyberpunk",
+    "manifest-v3",
+    "chromium",
+    "privacy",
+    "dns"
+  ],
+  "author": "linskay",
+  "license": "MIT"
+}
