@@ -31,6 +31,7 @@ const filesToCopy = [
   'doh-host.exe',
   'com.doh.switcher.json',
   'install-host.bat',
+  'clear-policy.bat',
   'README.md',
   'LICENSE'
 ];
