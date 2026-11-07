@@ -1,6 +1,7 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Win32;
 
 class Program {
@@ -27,7 +28,7 @@ class Program {
 
             string json = Encoding.UTF8.GetString(buffer, 0, total);
 
-            // Simple JSON parsing without external dependencies
+            // Parse mode & template
             string mode = "automatic";
             string template = "";
 
@@ -49,19 +50,53 @@ class Program {
                 }
             }
 
-            // Write to Chrome Registry Policies (HKCU - no admin required!)
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Google\Chrome")) {
-                if (key != null) {
-                    key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
-                    if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
-                    } else {
-                        try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+            bool hklmOk = false;
+            bool hkcuOk = false;
+            bool localStateOk = false;
+
+            // 1. Write HKLM Policies (Enforced globally on Windows without domain requirements)
+            try {
+                using (RegistryKey key = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Google\Chrome")) {
+                    if (key != null) {
+                        key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+                        if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                            key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        } else {
+                            try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        }
+                        hklmOk = true;
                     }
                 }
-            }
+            } catch {}
 
-            // Also set for Chromium & Edge if present
+            try {
+                using (RegistryKey edgeKey = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
+                    if (edgeKey != null) {
+                        edgeKey.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+                        if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                            edgeKey.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        } else {
+                            try { edgeKey.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        }
+                    }
+                }
+            } catch {}
+
+            // 2. Write HKCU Policies
+            try {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Google\Chrome")) {
+                    if (key != null) {
+                        key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+                        if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                            key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        } else {
+                            try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        }
+                        hkcuOk = true;
+                    }
+                }
+            } catch {}
+
             try {
                 using (RegistryKey edgeKey = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
                     if (edgeKey != null) {
@@ -75,8 +110,26 @@ class Program {
                 }
             } catch {}
 
-            // Send reply
-            string reply = "{\"success\":true,\"mode\":\"" + mode + "\",\"template\":\"" + template + "\"}";
+            // 3. Update Chromium Local State files directly
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string[] localStatePaths = new string[] {
+                Path.Combine(localAppData, @"Google\Chrome\User Data\Local State"),
+                Path.Combine(localAppData, @"Microsoft\Edge\User Data\Local State"),
+                Path.Combine(localAppData, @"BraveSoftware\Brave-Browser\User Data\Local State"),
+                Path.Combine(localAppData, @"Chromium\User Data\Local State")
+            };
+
+            foreach (string p in localStatePaths) {
+                try {
+                    if (File.Exists(p)) {
+                        UpdateLocalStateDns(p, mode, template);
+                        localStateOk = true;
+                    }
+                } catch {}
+            }
+
+            // Reply to extension
+            string reply = "{\"success\":true,\"mode\":\"" + mode + "\",\"template\":\"" + template + "\",\"hklm\":" + (hklmOk ? "true" : "false") + ",\"hkcu\":" + (hkcuOk ? "true" : "false") + ",\"localState\":" + (localStateOk ? "true" : "false") + "}";
             byte[] replyBytes = Encoding.UTF8.GetBytes(reply);
             byte[] outLen = BitConverter.GetBytes(replyBytes.Length);
 
@@ -93,5 +146,23 @@ class Program {
                 stdout.Flush();
             } catch {}
         }
+    }
+
+    static void UpdateLocalStateDns(string filePath, string mode, string template) {
+        string text = File.ReadAllText(filePath, Encoding.UTF8);
+
+        string dohReplacement = "\"dns_over_https\":{\"mode\":\"" + mode + "\",\"templates\":\"" + (mode == "secure" ? template : "") + "\"}";
+
+        if (Regex.IsMatch(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}")) {
+            text = Regex.Replace(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}", dohReplacement);
+        } else {
+            // Insert at beginning of root object
+            int firstBrace = text.IndexOf('{');
+            if (firstBrace >= 0) {
+                text = text.Substring(0, firstBrace + 1) + dohReplacement + "," + text.Substring(firstBrace + 1);
+            }
+        }
+
+        File.WriteAllText(filePath, text, Encoding.UTF8);
     }
 }

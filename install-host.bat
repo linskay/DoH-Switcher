@@ -1,15 +1,24 @@
 @echo off
-setlocal
-echo ====================================================
-echo  DoH-Switcher // Installing Native Policy Engine
-echo ====================================================
+setlocal EnableDelayedExpansion
+
+:: Check for Administrator privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo [ELEVATING] Requesting Administrator privileges to unlock HKLM policy...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath cmd.exe -ArgumentList '/c `\"%~f0`\"' -Verb RunAs"
+    exit /b
+)
+
+echo ========================================================
+echo  DoH-Switcher // Installing Native Policy Engine (Admin)
+echo ========================================================
 
 set "HOST_DIR=%~dp0"
 set "HOST_DIR=%HOST_DIR:~0,-1%"
 set "JSON_PATH=%HOST_DIR%\com.doh.switcher.json"
 set "EXE_PATH=%HOST_DIR%\doh-host.exe"
 
-:: Replace relative path with absolute path in json if needed
+:: 1. Write clean json manifest with absolute path to doh-host.exe
 (
   echo {
   echo   "name": "com.doh.switcher",
@@ -22,17 +31,21 @@ set "EXE_PATH=%HOST_DIR%\doh-host.exe"
   echo }
 ) > "%JSON_PATH%"
 
-:: Register Native Messaging Host for Google Chrome
+:: 2. Register Native Messaging Host in both HKCU and HKLM
 REG ADD "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.doh.switcher" /ve /t REG_SZ /d "%JSON_PATH%" /f >nul
-
-:: Register for Microsoft Edge
+REG ADD "HKLM\Software\Google\Chrome\NativeMessagingHosts\com.doh.switcher" /ve /t REG_SZ /d "%JSON_PATH%" /f >nul
 REG ADD "HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.doh.switcher" /ve /t REG_SZ /d "%JSON_PATH%" /f >nul
+REG ADD "HKLM\Software\Microsoft\Edge\NativeMessagingHosts\com.doh.switcher" /ve /t REG_SZ /d "%JSON_PATH%" /f >nul
 
-:: Register for Chromium
-REG ADD "HKCU\Software\Chromium\NativeMessagingHosts\com.doh.switcher" /ve /t REG_SZ /d "%JSON_PATH%" /f >nul
+:: 3. Create Policy keys in HKLM and grant write control to Users (S-1-5-32-545)
+REG ADD "HKLM\Software\Policies\Google\Chrome" /f >nul
+REG ADD "HKLM\Software\Policies\Microsoft\Edge" /f >nul
+
+powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Google\Chrome'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Google\Chrome' $acl" >nul 2>&1
+powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Microsoft\Edge'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Microsoft\Edge' $acl" >nul 2>&1
 
 echo.
-echo [SUCCESS] Native Policy Host registered successfully!
-echo Extension will now automatically change DNS in 1 click.
+echo [SUCCESS] Native Policy Engine installed and unlocked!
+echo Chrome will now apply DNS-over-HTTPS in 1-click without any admin prompts.
 echo.
 pause

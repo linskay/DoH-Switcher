@@ -111,6 +111,13 @@ function setupEventListeners() {
     chrome.tabs.create({ url: 'chrome://settings/security' });
   });
 
+  const btnOpenPolicy = document.getElementById('btnOpenPolicy');
+  if (btnOpenPolicy) {
+    btnOpenPolicy.addEventListener('click', () => {
+      chrome.tabs.create({ url: 'chrome://policy' });
+    });
+  }
+
   btnToggleInject.addEventListener('click', () => {
     const isHidden = injectForm.classList.contains('hidden');
     if (isHidden) {
@@ -302,18 +309,16 @@ function renderPresetsList() {
       actions.appendChild(btnConnect);
     }
 
-    // Delete button (allowed for custom presets)
-    if (!preset.isDefault) {
-      const btnDel = document.createElement('button');
-      btnDel.className = 'btn-delete';
-      btnDel.innerHTML = '&#x2715;'; // Cross
-      btnDel.title = 'Delete custom node';
-      btnDel.addEventListener('click', (e) => {
-        e.stopPropagation();
-        deletePreset(preset.id);
-      });
-      actions.appendChild(btnDel);
-    }
+    // Delete button (available for all presets)
+    const btnDel = document.createElement('button');
+    btnDel.className = 'btn-delete';
+    btnDel.innerHTML = '&#x2715;'; // Cross
+    btnDel.title = 'Delete node';
+    btnDel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deletePreset(preset.id);
+    });
+    actions.appendChild(btnDel);
 
     // Clicking card activates it
     card.addEventListener('click', () => {
@@ -493,9 +498,15 @@ async function handleInjectSubmit(e) {
 }
 
 /**
- * Delete a custom preset
+ * Delete a preset from the list
  */
 async function deletePreset(presetId) {
+  if (activePresetId === presetId) {
+    activePresetId = '';
+    currentTemplate = '';
+    saveActiveState('automatic', '', '');
+    updateHudUI('automatic', '');
+  }
   currentPresets = currentPresets.filter(p => p.id !== presetId);
   await savePresets();
   renderPresetsList();
