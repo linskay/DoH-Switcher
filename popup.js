@@ -618,6 +618,7 @@ async function activatePreset(preset) {
 
         // Host reported success
         logTerminal('NATIVE', `Policies applied (Reg: ${response.registry}, LocalState: ${response.localState}, Cache: ${response.cacheFlushed})`);
+        refreshOpenPolicyTabs();
 
         // 3. Perform Live Verification Probe
         activeState.connectionState = DNS_STATE.VERIFYING;
@@ -860,6 +861,23 @@ async function pingSinglePreset(preset) {
 }
 
 /**
+ * Auto-refresh any open chrome://policy or edge://policy tabs
+ */
+function refreshOpenPolicyTabs() {
+  try {
+    if (chrome.tabs && chrome.tabs.query) {
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(t => {
+          if (t.url && (t.url.startsWith('chrome://policy') || t.url.startsWith('edge://policy'))) {
+            chrome.tabs.reload(t.id).catch(() => {});
+          }
+        });
+      });
+    }
+  } catch (e) {}
+}
+
+/**
  * Revert to Automatic System Mode
  */
 function handleSetAuto() {
@@ -876,11 +894,18 @@ function handleSetAuto() {
     chrome.runtime.sendNativeMessage(
       'com.doh.switcher',
       { action: 'SET_DOH', mode: 'automatic', template: '' },
-      () => {
-        if (chrome.runtime.lastError) {}
+      (response) => {
+        if (chrome.runtime.lastError || !response || !response.success) {
+          logTerminal('ERR', `Host error: ${chrome.runtime.lastError ? chrome.runtime.lastError.message : 'failed'}`);
+        } else {
+          logTerminal('NATIVE', 'Reverted policies to opportunistic auto mode.');
+          refreshOpenPolicyTabs();
+        }
       }
     );
-  } catch (err) {}
+  } catch (err) {
+    logTerminal('ERR', `Execution exception: ${err.message}`);
+  }
 
   logTerminal('MODE', 'Reverted to Chromium Opportunistic Auto DNS.');
   showToast('MODE // SYSTEM AUTO DEFAULT');
@@ -903,11 +928,18 @@ function handleKillswitch() {
     chrome.runtime.sendNativeMessage(
       'com.doh.switcher',
       { action: 'SET_DOH', mode: 'off', template: '' },
-      () => {
-        if (chrome.runtime.lastError) {}
+      (response) => {
+        if (chrome.runtime.lastError || !response || !response.success) {
+          logTerminal('ERR', `Host error: ${chrome.runtime.lastError ? chrome.runtime.lastError.message : 'failed'}`);
+        } else {
+          logTerminal('NATIVE', 'Killswitch applied to system policy (mode: off).');
+          refreshOpenPolicyTabs();
+        }
       }
     );
-  } catch (err) {}
+  } catch (err) {
+    logTerminal('ERR', `Execution exception: ${err.message}`);
+  }
 
   logTerminal('KILL', 'Secure DNS Terminated. Fallback to Plaintext DNS.');
   showToast('KILLSWITCH // SECURE DNS TERMINATED');

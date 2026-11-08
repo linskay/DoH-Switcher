@@ -15,10 +15,14 @@ class Program {
             Stream stdin = Console.OpenStandardInput();
             Stream stdout = Console.OpenStandardOutput();
 
-            // Read 4-byte message length
+            // Read 4-byte message length safely in a loop
             byte[] lenBytes = new byte[4];
-            int read = stdin.Read(lenBytes, 0, 4);
-            if (read < 4) return;
+            int read = 0;
+            while (read < 4) {
+                int r = stdin.Read(lenBytes, read, 4 - read);
+                if (r <= 0) return;
+                read += r;
+            }
 
             int len = BitConverter.ToInt32(lenBytes, 0);
             // Limit message size to 16KB to prevent memory exhaustion attacks
@@ -120,17 +124,11 @@ class Program {
                 template = "";
             }
 
-            // CRITICAL TRANSITION: Teardown existing socket pool if switching in secure mode
-            if (mode == "secure") {
-                SetRegistryPolicies("off", "");
-                Thread.Sleep(60);
-            }
-
             bool regOk = false;
             bool localStateOk = false;
             bool cacheOk = false;
 
-            // 1. Write Registry Policies (HKLM + HKCU)
+            // 1. Write Registry Policies Atomically (HKLM + HKCU)
             try {
                 regOk = SetRegistryPolicies(mode, template);
             } catch (Exception ex) {
