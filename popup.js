@@ -70,17 +70,6 @@ const DEFAULT_PRESETS = [
     latency: null,
     status: null
   },
-    {
-    id: "dagami-dns",
-    name: "Dagami DNS",
-    url: "https://dns.dagami.ru/dns-query{?dns}",
-    tag: "STRICT NO-LOGS / RU",
-    category: "privacy",
-    features: ["⚡ FAST", "🛡 NO-LOGS"],
-    isFavorite: false,
-    latency: null,
-    status: null
-  },
   {
     id: "control-d",
     name: "Control D (Free)",
@@ -247,15 +236,8 @@ function loadStateAndPresets() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['presets', 'activeState'], (res) => {
             if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
-        currentPresets = res.presets;
-        // Auto-merge Dagami DNS if not present
-        if (!currentPresets.some(p => p.id === 'dagami-dns' || (p.url && p.url.includes('dagami')))) {
-          const dagami = DEFAULT_PRESETS.find(p => p.id === 'dagami-dns');
-          if (dagami) {
-            currentPresets.push(dagami);
-            savePresets();
-          }
-        }
+        // Filter out auto-injected dagami-dns preset
+        currentPresets = res.presets.filter(p => p.id !== 'dagami-dns');
       } else {
         currentPresets = [...DEFAULT_PRESETS];
         chrome.storage.local.set({ presets: currentPresets });

@@ -81,7 +81,6 @@
 | **AdGuard DNS** | Блокировка рекламы | AdBlocker / Trackers | `https://dns.adguard-dns.com/dns-query{?dns}` |
 | **Quad9** | Защита от угроз | Threat Intel | `https://dns.quad9.net/dns-query{?dns}` |
 | **Mullvad DNS** | Строго без логов | Strict No-Logs | `https://dns.mullvad.net/dns-query{?dns}` |
-| **Dagami DNS** | Строго без логов / RU | Fast / No-Logs | `https://dns.dagami.ru/dns-query{?dns}` |
 | **Control D** | Без цензуры | Free / No-Filter | `https://freedns.controld.com/p0{?dns}` |
 
 ---
