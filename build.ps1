@@ -24,11 +24,17 @@ if (Test-Path $stageDir) {
 }
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
-$files = @("manifest.json", "background.js", "popup.html", "popup.css", "popup.js", "doh-host.exe", "com.doh.switcher.json", "install-host.bat", "README.md", "LICENSE")
+$files = @("manifest.json", "background.js", "popup.html", "popup.css", "popup.js", "doh-host.exe", "com.doh.switcher.json", "install-host.bat", "clear-policy.bat", "README.md", "LICENSE")
 foreach ($f in $files) {
     $src = Join-Path $rootDir $f
     if (Test-Path $src) {
-        Copy-Item $src -Destination $stageDir
+        if ($f -eq "com.doh.switcher.json") {
+            $jsonObj = Get-Content $src -Raw | ConvertFrom-Json
+            $jsonObj.path = "doh-host.exe"
+            $jsonObj | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $stageDir $f) -Encoding UTF8
+        } else {
+            Copy-Item $src -Destination $stageDir
+        }
     }
 }
 
