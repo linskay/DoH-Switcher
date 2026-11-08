@@ -39,7 +39,13 @@ const filesToCopy = [
 for (const f of filesToCopy) {
   const src = path.join(rootDir, f);
   if (fs.existsSync(src)) {
-    fs.copyFileSync(src, path.join(stageDir, f));
+    if (f === 'com.doh.switcher.json') {
+      const manifestObj = JSON.parse(fs.readFileSync(src, 'utf8'));
+      manifestObj.path = 'doh-host.exe';
+      fs.writeFileSync(path.join(stageDir, f), JSON.stringify(manifestObj, null, 2));
+    } else {
+      fs.copyFileSync(src, path.join(stageDir, f));
+    }
   }
 }
 

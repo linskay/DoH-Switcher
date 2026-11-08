@@ -1,7 +1,7 @@
 {
   "name": "com.doh.switcher",
   "description": "DoH Switcher Native Policy Host",
-  "path": "C:\\Users\\ANGELPC\\Desktop\\DoH-Switcher\\doh-host.exe",
+  "path": "doh-host.exe",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://pbjakpldedlnafhfamcldkgghgejdakd/"
