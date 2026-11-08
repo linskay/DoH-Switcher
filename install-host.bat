@@ -13,6 +13,7 @@ echo ========================================================
 echo  DoH-Switcher // Installing Native Policy Engine (Admin)
 echo ========================================================
 
+cd /d "%~dp0"
 set "HOST_DIR=%~dp0"
 set "HOST_DIR=%HOST_DIR:~0,-1%"
 set "JSON_PATH=%HOST_DIR%\com.doh.switcher.json"
