@@ -219,6 +219,7 @@ class Program {
             try {
                 using (RegistryKey key = OpenOrCreateKey(Registry.LocalMachine, path)) {
                     if (key != null) {
+                        try { key.DeleteValue("", false); } catch {}
                         key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
                         if (mode == "secure" && !string.IsNullOrEmpty(template)) {
                             key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
@@ -234,6 +235,7 @@ class Program {
             try {
                 using (RegistryKey key = OpenOrCreateKey(Registry.CurrentUser, path)) {
                     if (key != null) {
+                        try { key.DeleteValue("", false); } catch {}
                         key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
                         if (mode == "secure" && !string.IsNullOrEmpty(template)) {
                             key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);

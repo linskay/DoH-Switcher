@@ -41,6 +41,8 @@ REG ADD "HKLM\Software\Microsoft\Edge\NativeMessagingHosts\com.doh.switcher" /ve
 :: 3. Create Policy keys in HKLM and grant write control to Users (S-1-5-32-545)
 REG ADD "HKLM\Software\Policies\Google\Chrome" /f >nul
 REG ADD "HKLM\Software\Policies\Microsoft\Edge" /f >nul
+REG DELETE "HKLM\Software\Policies\Google\Chrome" /ve /f >nul 2>&1
+REG DELETE "HKLM\Software\Policies\Microsoft\Edge" /ve /f >nul 2>&1
 
 powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Google\Chrome'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Google\Chrome' $acl"
 powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Microsoft\Edge'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Microsoft\Edge' $acl"
