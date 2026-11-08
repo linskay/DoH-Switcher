@@ -236,9 +236,17 @@ function setupEventListeners() {
 function loadStateAndPresets() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['presets', 'activeState'], (res) => {
-            if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
-        // Filter out auto-injected dagami-dns preset
-        currentPresets = res.presets.filter(p => p.id !== 'dagami-dns');
+      if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
+        // Filter out auto-injected dagami-dns preset and auto-repair/normalize all preset URLs
+        currentPresets = res.presets
+          .filter(p => p.id !== 'dagami-dns')
+          .map(p => {
+            if (p.url) {
+              p.url = normalizeDohUrl(p.url);
+            }
+            return p;
+          });
+        chrome.storage.local.set({ presets: currentPresets });
       } else {
         currentPresets = [...DEFAULT_PRESETS];
         chrome.storage.local.set({ presets: currentPresets });
@@ -246,6 +254,9 @@ function loadStateAndPresets() {
 
       if (res.activeState) {
         activeState = Object.assign(activeState, res.activeState);
+        if (activeState.template) {
+          activeState.template = normalizeDohUrl(activeState.template);
+        }
       } else {
         activeState.mode = 'automatic';
         activeState.connectionState = DNS_STATE.DISCONNECTED;
@@ -281,22 +292,17 @@ function normalizeDohUrl(url) {
   let clean = (url || '').trim();
   if (!clean) return '';
 
-  if (!clean.startsWith('https://') && !clean.startsWith('http://')) {
+  // Strip wrapping quotes or angle brackets
+  clean = clean.replace(/^[<"']+|[>"']+$/g, '');
+
+  // Prepend https:// if missing
+  if (!/^https?:\/\//i.test(clean)) {
     clean = 'https://' + clean;
+  } else if (clean.startsWith('http://')) {
+    clean = 'https://' + clean.slice(7);
   }
 
-  try {
-    const rawNoQuery = clean.replace('{?dns}', '');
-    const parsed = new URL(rawNoQuery);
-    if (parsed.pathname === '' || parsed.pathname === '/') {
-      parsed.pathname = '/dns-query';
-    }
-    clean = parsed.origin + parsed.pathname;
-    if (parsed.search) {
-      clean += parsed.search;
-    }
-  } catch (e) {}
-
+  // Append {?dns} placeholder if no query params present
   if (!clean.includes('{?dns}') && !clean.includes('?')) {
     clean += '{?dns}';
   }
@@ -608,6 +614,12 @@ async function activatePreset(preset) {
         updateHudUI();
 
         const diag = await testDohEndpoint(cleanUrl);
+        if (diag.resolvedUrl && diag.resolvedUrl !== preset.url) {
+          preset.url = diag.resolvedUrl;
+          cleanUrl = diag.resolvedUrl;
+          activeState.template = diag.resolvedUrl;
+        }
+
         if (diag.ok) {
           activeState.connectionState = DNS_STATE.CONNECTED;
           activeState.mode = 'secure';
@@ -625,14 +637,15 @@ async function activatePreset(preset) {
           // Endpoint unverified or timeout, but policy was written
           activeState.connectionState = DNS_STATE.CONNECTED;
           activeState.mode = 'secure';
-          preset.status = 'TIMEOUT';
+          preset.latency = null;
+          preset.status = 'UNVERIFIED';
           await savePresets();
           await saveActiveState();
 
           updateHudUI();
           renderPresetsList();
-          logTerminal('WARN', `Endpoint probe timeout: ${diag.error}`);
-          showToast(`POLICY ACTIVE // ${preset.name} (Probe timeout)`);
+          logTerminal('WARN', `Endpoint probe warning: ${diag.error}`);
+          showToast(`POLICY ACTIVE // ${preset.name} (${diag.error})`);
         }
       }
     );
@@ -647,10 +660,10 @@ async function activatePreset(preset) {
 }
 
 /**
- * Live DoH Endpoint Test (RFC 8484 DNS Query Probe)
+ * Live DoH Endpoint Test (RFC 8484 DNS Query Probe + Fallback)
  */
 async function testDohEndpoint(endpointUrl) {
-  const clean = normalizeDohUrl(endpointUrl);
+  let clean = normalizeDohUrl(endpointUrl);
   // RFC 8484 standard query for example.com (Type A, IN)
   const dnsQueryBase64 = 'AAABAAABAAAAAAAAB2V4YW1wbGUDY29tAAABAAEA';
   
@@ -662,7 +675,7 @@ async function testDohEndpoint(endpointUrl) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
+  const timeoutId = setTimeout(() => controller.abort(), 6000);
 
   const t0 = performance.now();
   try {
@@ -678,15 +691,43 @@ async function testDohEndpoint(endpointUrl) {
     const t1 = performance.now();
     const latency = Math.round(t1 - t0);
 
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      return { ok: false, latency: null, error: 'RETURNS HTML (NOT DOH)' };
+    }
+
     if (res.ok) {
-      return { ok: true, latency: latency, status: res.status };
+      return { ok: true, latency: latency, status: res.status, resolvedUrl: clean };
     } else {
-      return { ok: false, latency: latency, error: `HTTP ${res.status}` };
+      return { ok: false, latency: null, error: `HTTP ${res.status}` };
     }
   } catch (err) {
     clearTimeout(timeoutId);
-    const t1 = performance.now();
-    return { ok: false, latency: Math.round(t1 - t0), error: err.name === 'AbortError' ? 'TIMEOUT (3.5s)' : err.message };
+    if (err.name === 'AbortError') {
+      return { ok: false, latency: null, error: 'TIMEOUT (6s)' };
+    }
+
+    // CORS or fetch fallback probe with mode: 'no-cors'
+    try {
+      const fbController = new AbortController();
+      const fbTimeout = setTimeout(() => fbController.abort(), 4500);
+      const fbT0 = performance.now();
+      await fetch(targetUrl, {
+        method: 'GET',
+        mode: 'no-cors',
+        signal: fbController.signal
+      });
+      clearTimeout(fbTimeout);
+      const fbT1 = performance.now();
+      const fbLatency = Math.round(fbT1 - fbT0);
+      return { ok: true, latency: fbLatency, status: 200, resolvedUrl: clean };
+    } catch (fbErr) {
+      return {
+        ok: false,
+        latency: null,
+        error: fbErr.name === 'AbortError' ? 'TIMEOUT (4.5s)' : (fbErr.message || 'UNREACHABLE')
+      };
+    }
   }
 }
 
@@ -719,8 +760,14 @@ async function runActiveDiagnostics() {
  */
 async function pingSinglePreset(preset) {
   logTerminal('TEST', `Pinging ${preset.name}...`);
+  preset.status = 'PROBING...';
+  renderPresetsList();
+
   const diag = await testDohEndpoint(preset.url);
-  preset.latency = diag.latency;
+  if (diag.resolvedUrl && diag.resolvedUrl !== preset.url) {
+    preset.url = diag.resolvedUrl;
+  }
+  preset.latency = diag.ok ? diag.latency : null;
   preset.status = diag.ok ? 'ONLINE' : 'OFFLINE';
   await savePresets();
   renderPresetsList();
@@ -808,40 +855,37 @@ async function deletePreset(presetId) {
  */
 function validateInjectForm() {
   const name = inputNodeName.value.trim();
-  const url = inputNodeUrl.value.trim();
+  let url = inputNodeUrl.value.trim();
+
+  if (!url) {
+    urlValidationMsg.textContent = 'Enter domain or URL (e.g. dns.dagami.ru)';
+    urlValidationMsg.className = 'url-msg';
+    btnSubmitInject.disabled = true;
+    return;
+  }
+
+  // Auto add https:// for check if missing
+  if (!/^https?:\/\//i.test(url)) {
+    url = 'https://' + url;
+  }
 
   let isValidUrl = false;
   try {
-    if (url.startsWith('https://')) {
-      const parsed = new URL(url);
-      isValidUrl = parsed.protocol === 'https:' && parsed.hostname.length > 2;
-    }
+    const parsed = new URL(url);
+    isValidUrl = (parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname.length > 2;
   } catch (e) {
     isValidUrl = false;
   }
 
-  if (!url) {
-    urlValidationMsg.textContent = 'Must start with https://';
-    urlValidationMsg.className = 'url-msg';
-    btnSubmitInject.disabled = true;
-    return;
-  }
-
-  if (!url.startsWith('https://')) {
-    urlValidationMsg.textContent = 'SECURITY REJECT: URL must start with https://';
-    urlValidationMsg.className = 'url-msg';
-    btnSubmitInject.disabled = true;
-    return;
-  }
-
   if (!isValidUrl) {
-    urlValidationMsg.textContent = 'SYNTAX ERROR: Invalid HTTPS URL format';
+    urlValidationMsg.textContent = 'SYNTAX ERROR: Invalid domain or URL format';
     urlValidationMsg.className = 'url-msg';
     btnSubmitInject.disabled = true;
     return;
   }
 
-  urlValidationMsg.textContent = 'ENDPOINT PROTOCOL VERIFIED [HTTPS OK]';
+  const normalized = normalizeDohUrl(url);
+  urlValidationMsg.textContent = `TARGET: ${normalized}`;
   urlValidationMsg.className = 'url-msg valid';
   btnSubmitInject.disabled = (name.length === 0);
 }
@@ -856,30 +900,39 @@ async function handleInjectSubmit(e) {
   let url = inputNodeUrl.value.trim();
   const category = inputNodeCategory.value || 'custom';
 
-  if (!name || !url.startsWith('https://')) return;
+  if (!name || !url) return;
 
   url = normalizeDohUrl(url);
 
-  // Prevent duplicates
-  const exists = currentPresets.some(p => p.url.toLowerCase() === url.toLowerCase());
-  if (exists) {
-    showToast('NODE ALREADY IN MATRIX');
-    return;
+  // If node with this URL or name already exists in matrix, update it seamlessly
+  const existingIndex = currentPresets.findIndex(p =>
+    p.url.toLowerCase() === url.toLowerCase() || p.name.toLowerCase() === name.toLowerCase()
+  );
+
+  let targetPreset;
+  if (existingIndex >= 0) {
+    currentPresets[existingIndex].name = name;
+    currentPresets[existingIndex].url = url;
+    currentPresets[existingIndex].category = category;
+    currentPresets[existingIndex].tag = category.toUpperCase();
+    targetPreset = currentPresets[existingIndex];
+    logTerminal('INJECT', `Updated existing node: ${name} (${url})`);
+  } else {
+    targetPreset = {
+      id: 'custom-' + Date.now(),
+      name: name,
+      url: url,
+      tag: category.toUpperCase(),
+      category: category,
+      features: ['⚡ CUSTOM'],
+      isFavorite: false,
+      latency: null,
+      status: null
+    };
+    currentPresets.push(targetPreset);
+    logTerminal('INJECT', `Added custom node: ${name} (${url})`);
   }
 
-  const newPreset = {
-    id: 'custom-' + Date.now(),
-    name: name,
-    url: url,
-    tag: category.toUpperCase(),
-    category: category,
-    features: ['⚡ CUSTOM'],
-    isFavorite: false,
-    latency: null,
-    status: null
-  };
-
-  currentPresets.push(newPreset);
   await savePresets();
 
   inputNodeName.value = '';
@@ -889,8 +942,8 @@ async function handleInjectSubmit(e) {
   injectToggleIcon.textContent = '+';
 
   renderPresetsList();
-  logTerminal('INJECT', `Added custom node: ${newPreset.name}`);
-  activatePreset(newPreset);
+  showToast(`NODE SAVED // ${name}`);
+  activatePreset(targetPreset);
 }
 
 /**
