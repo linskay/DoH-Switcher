@@ -54,23 +54,48 @@ class Program {
                 mode = "automatic";
             }
 
-            // Normalize DoH Template: Ensure RFC 8484 GET template {?dns} and valid endpoint path
-            if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+            // Strict HTTPS enforcement for Secure DoH mode
+            if (mode == "secure") {
+                if (string.IsNullOrEmpty(template)) {
+                    SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Secure mode requires a valid DoH template URL.");
+                    return;
+                }
+
                 template = template.Trim();
-                if (!template.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !template.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
+
+                // Explicitly reject plain HTTP or non-secure protocols
+                if (template.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
+                    SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Insecure plaintext HTTP forbidden. DNS-over-HTTPS requires strict HTTPS.");
+                    return;
+                }
+
+                // Auto-prepend https:// if scheme is missing entirely
+                if (!template.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) {
                     template = "https://" + template;
                 }
+
+                // Deep URI Validation: verify scheme, hostname and validity
                 try {
                     string cleanUri = template.Replace("{?dns}", "");
                     Uri uri = new Uri(cleanUri);
-                    if (string.IsNullOrEmpty(uri.AbsolutePath) || uri.AbsolutePath == "/") {
-                        template = uri.GetLeftPart(UriPartial.Authority) + "/dns-query";
+                    if (uri.Scheme != Uri.UriSchemeHttps) {
+                        SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: URI scheme must be HTTPS.");
+                        return;
                     }
-                } catch {}
+                    if (string.IsNullOrEmpty(uri.Host) || uri.Host.Length < 3) {
+                        SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Invalid host in DoH template URL.");
+                        return;
+                    }
+                } catch (Exception uriEx) {
+                    SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Malformed DoH URL: " + uriEx.Message);
+                    return;
+                }
+
+                // Ensure RFC 8484 GET template placeholder {?dns} if not present
                 if (!template.Contains("{?dns}") && !template.Contains("?")) {
                     template = template + "{?dns}";
                 }
-            } else if (mode != "secure") {
+            } else {
                 template = "";
             }
 

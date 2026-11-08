@@ -872,6 +872,14 @@ function validateInjectForm() {
     return;
   }
 
+  // Explicitly reject insecure plaintext HTTP
+  if (url.startsWith('http://')) {
+    urlValidationMsg.textContent = 'SECURITY REJECT: Plaintext HTTP is insecure! Strict HTTPS required.';
+    urlValidationMsg.className = 'url-msg';
+    btnSubmitInject.disabled = true;
+    return;
+  }
+
   // Auto add https:// for check if missing
   if (!/^https?:\/\//i.test(url)) {
     url = 'https://' + url;
@@ -880,13 +888,13 @@ function validateInjectForm() {
   let isValidUrl = false;
   try {
     const parsed = new URL(url);
-    isValidUrl = (parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.hostname.length > 2;
+    isValidUrl = (parsed.protocol === 'https:') && parsed.hostname.length > 2;
   } catch (e) {
     isValidUrl = false;
   }
 
   if (!isValidUrl) {
-    urlValidationMsg.textContent = 'SYNTAX ERROR: Invalid domain or URL format';
+    urlValidationMsg.textContent = 'SYNTAX ERROR: Invalid HTTPS domain or URL format';
     urlValidationMsg.className = 'url-msg';
     btnSubmitInject.disabled = true;
     return;
@@ -909,6 +917,11 @@ async function handleInjectSubmit(e) {
   const category = inputNodeCategory.value || 'custom';
 
   if (!name || !url) return;
+
+  if (url.startsWith('http://')) {
+    showToast('SECURITY REJECT // HTTP FORBIDDEN');
+    return;
+  }
 
   url = normalizeDohUrl(url);
 
