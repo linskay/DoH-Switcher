@@ -5,7 +5,7 @@ setlocal EnableDelayedExpansion
 net session >nul 2>&1
 if %errorLevel% neq 0 (
     echo [ELEVATING] Requesting Administrator privileges to unlock HKLM policy...
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath cmd.exe -ArgumentList '/c `\"%~f0`\"' -Verb RunAs"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process cmd.exe -ArgumentList '/k \"\"%~f0\"\"' -Verb RunAs"
     exit /b
 )
 
@@ -41,8 +41,8 @@ REG ADD "HKLM\Software\Microsoft\Edge\NativeMessagingHosts\com.doh.switcher" /ve
 REG ADD "HKLM\Software\Policies\Google\Chrome" /f >nul
 REG ADD "HKLM\Software\Policies\Microsoft\Edge" /f >nul
 
-powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Google\Chrome'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Google\Chrome' $acl" >nul 2>&1
-powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Microsoft\Edge'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Microsoft\Edge' $acl" >nul 2>&1
+powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Google\Chrome'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Google\Chrome' $acl"
+powershell -NoProfile -Command "$acl = Get-Acl 'HKLM:\Software\Policies\Microsoft\Edge'; $rule = New-Object System.Security.AccessControl.RegistryAccessRule([System.Security.Principal.SecurityIdentifier]'S-1-5-32-545','FullControl','ContainerInherit,ObjectInherit','None','Allow'); $acl.SetAccessRule($rule); Set-Acl 'HKLM:\Software\Policies\Microsoft\Edge' $acl"
 
 echo.
 echo [SUCCESS] Native Policy Engine installed and unlocked!

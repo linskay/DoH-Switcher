@@ -132,52 +132,56 @@ class Program {
         return json.Substring(q1 + 1, q2 - q1 - 1).Replace("\\/", "/");
     }
 
+    static RegistryKey OpenOrCreateKey(RegistryKey root, string subKey) {
+        try {
+            RegistryKey key = root.OpenSubKey(subKey, true);
+            if (key != null) return key;
+        } catch {}
+        try {
+            return root.CreateSubKey(subKey);
+        } catch {}
+        return null;
+    }
+
     static bool SetRegistryPolicies(string mode, string template) {
         bool written = false;
 
-        // Chrome HKLM
-        try {
-            using (RegistryKey key = Registry.LocalMachine.CreateSubKey(@"Software\Policies\Google\Chrome")) {
-                if (key != null) {
-                    key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
-                    if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
-                    } else {
-                        try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
-                    }
-                    written = true;
-                }
-            }
-        } catch {}
+        string[] targets = new string[] {
+            @"Software\Policies\Google\Chrome",
+            @"Software\Policies\Microsoft\Edge"
+        };
 
-        // Chrome HKCU
-        try {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Google\Chrome")) {
-                if (key != null) {
-                    key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
-                    if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
-                    } else {
-                        try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+        foreach (string path in targets) {
+            // Write to HKLM (Primary for Chrome live policy engine on all Windows editions)
+            try {
+                using (RegistryKey key = OpenOrCreateKey(Registry.LocalMachine, path)) {
+                    if (key != null) {
+                        key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+                        if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                            key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        } else {
+                            try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        }
+                        written = true;
                     }
-                    written = true;
                 }
-            }
-        } catch {}
+            } catch {}
 
-        // Edge HKLM + HKCU
-        try {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(@"Software\Policies\Microsoft\Edge")) {
-                if (key != null) {
-                    key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
-                    if (mode == "secure" && !string.IsNullOrEmpty(template)) {
-                        key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
-                    } else {
-                        try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+            // Write to HKCU (Secondary)
+            try {
+                using (RegistryKey key = OpenOrCreateKey(Registry.CurrentUser, path)) {
+                    if (key != null) {
+                        key.SetValue("DnsOverHttpsMode", mode, RegistryValueKind.String);
+                        if (mode == "secure" && !string.IsNullOrEmpty(template)) {
+                            key.SetValue("DnsOverHttpsTemplates", template, RegistryValueKind.String);
+                        } else {
+                            try { key.DeleteValue("DnsOverHttpsTemplates", false); } catch {}
+                        }
+                        written = true;
                     }
                 }
-            }
-        } catch {}
+            } catch {}
+        }
 
         return written;
     }
