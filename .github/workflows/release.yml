@@ -21,18 +21,13 @@ jobs:
         with:
           node-version: 20
 
-      - name: Build extension zip
+      - name: Build extension release package
         run: |
-          mkdir -p dist/stage/icons
-          cp manifest.json background.js popup.html popup.css popup.js doh-host.exe com.doh.switcher.json install-host.bat README.md LICENSE dist/stage/ 2>/dev/null || cp manifest.json background.js popup.html popup.css popup.js README.md LICENSE dist/stage/
-          cp -r icons/* dist/stage/icons/
-          cd dist/stage
-          zip -r ../DoH-Switcher-v1.0.0.zip .
-          cd ../..
+          node package.js
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/DoH-Switcher-v1.0.0.zip
+          files: dist/*.zip
           name: Release ${{ github.ref_name }}
           generate_release_notes: true

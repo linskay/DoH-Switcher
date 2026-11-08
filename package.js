@@ -67,14 +67,18 @@ if (fs.existsSync(srcJs)) {
   }
 }
 
-// Create ZIP using PowerShell Compress-Archive on Windows
+// Create ZIP using PowerShell on Windows or zip on Linux/macOS
 if (fs.existsSync(zipPath)) {
   fs.unlinkSync(zipPath);
 }
 
 try {
-  const psCmd = `powershell -NoProfile -Command "Compress-Archive -Path '${stageDir}\\*' -DestinationPath '${zipPath}' -Force"`;
-  execSync(psCmd, { stdio: 'inherit' });
+  if (process.platform === 'win32') {
+    const psCmd = `powershell -NoProfile -Command "Compress-Archive -Path '${stageDir}\\*' -DestinationPath '${zipPath}' -Force"`;
+    execSync(psCmd, { stdio: 'inherit' });
+  } else {
+    execSync(`cd "${stageDir}" && zip -r "${zipPath}" .`, { stdio: 'inherit' });
+  }
   console.log(`\n>>> SUCCESS: Release package created at:`);
   console.log(`    ${zipPath}\n`);
 } catch (err) {
