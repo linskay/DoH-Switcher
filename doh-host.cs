@@ -21,7 +21,8 @@ class Program {
             if (read < 4) return;
 
             int len = BitConverter.ToInt32(lenBytes, 0);
-            if (len <= 0 || len > 1024 * 1024) return;
+            // Limit message size to 16KB to prevent memory exhaustion attacks
+            if (len <= 0 || len > 16384) return;
 
             byte[] buffer = new byte[len];
             int total = 0;
@@ -44,6 +45,13 @@ class Program {
             string mode = ExtractJsonValue(json, "mode");
             string template = ExtractJsonValue(json, "template");
 
+            // 1. Strict Action Whitelisting
+            if (action != "SET_DOH") {
+                SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Unauthorized action. Only SET_DOH permitted.");
+                return;
+            }
+
+            // 2. Strict Mode Whitelisting
             if (string.IsNullOrEmpty(mode)) {
                 mode = "automatic";
             } else {
@@ -54,7 +62,7 @@ class Program {
                 mode = "automatic";
             }
 
-            // Strict HTTPS enforcement for Secure DoH mode
+            // 3. Strict HTTPS enforcement and Input Sanitization for Secure DoH mode
             if (mode == "secure") {
                 if (string.IsNullOrEmpty(template)) {
                     SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Secure mode requires a valid DoH template URL.");
@@ -62,6 +70,19 @@ class Program {
                 }
 
                 template = template.Trim();
+
+                // Length & Character Sanitization: reject control characters, quotes, backslashes
+                if (template.Length > 2048) {
+                    SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: URL exceeds maximum length limit (2048 chars).");
+                    return;
+                }
+                for (int i = 0; i < template.Length; i++) {
+                    char c = template[i];
+                    if (c < 32 || c > 126 || c == '"' || c == '\\' || c == '<' || c == '>') {
+                        SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: URL contains illegal control or dangerous characters.");
+                        return;
+                    }
+                }
 
                 // Explicitly reject plain HTTP or non-secure protocols
                 if (template.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
@@ -82,7 +103,7 @@ class Program {
                         SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: URI scheme must be HTTPS.");
                         return;
                     }
-                    if (string.IsNullOrEmpty(uri.Host) || uri.Host.Length < 3) {
+                    if (string.IsNullOrEmpty(uri.Host) || uri.Host.Length < 3 || uri.Host.StartsWith(".") || uri.Host.EndsWith(".")) {
                         SendResponse(stdout, false, "error", "", false, false, false, "SECURITY REJECT: Invalid host in DoH template URL.");
                         return;
                     }
@@ -234,7 +255,9 @@ class Program {
 
     static void UpdateLocalStateFile(string filePath, string mode, string template) {
         string text = File.ReadAllText(filePath, Encoding.UTF8);
-        string block = "\"dns_over_https\":{\"mode\":\"" + mode + "\",\"templates\":\"" + (mode == "secure" ? template : "") + "\"}";
+        string safeMode = EscapeJson(mode);
+        string safeTemplate = EscapeJson(mode == "secure" ? template : "");
+        string block = "\"dns_over_https\":{\"mode\":\"" + safeMode + "\",\"templates\":\"" + safeTemplate + "\"}";
 
         if (Regex.IsMatch(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}")) {
             text = Regex.Replace(text, "\"dns_over_https\"\\s*:\\s*\\{[^}]*\\}", block);
