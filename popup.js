@@ -580,9 +580,10 @@ async function toggleFavorite(presetId) {
 }
 
 /**
- * Activate a DoH preset with strict multi-state verification
+ * Activate a DoH preset with strict multi-state verification and rollback
  */
 async function activatePreset(preset) {
+  const previousActiveState = JSON.parse(JSON.stringify(activeState));
   const cleanUrl = normalizeDohUrl(preset.url);
   connectingPresetId = preset.id;
 
@@ -606,10 +607,11 @@ async function activatePreset(preset) {
 
         if (chrome.runtime.lastError || !response || !response.success) {
           const err = chrome.runtime.lastError ? chrome.runtime.lastError.message : (response ? response.message : 'Unknown host failure');
-          activeState.connectionState = DNS_STATE.ERROR;
+          // Rollback to previous known good state
+          activeState = previousActiveState;
           updateHudUI();
           renderPresetsList();
-          logTerminal('ERR', `Native host error: ${err}`);
+          logTerminal('ERR', `Native host error: ${err}. Rolled back.`);
           showToast(`ERROR // ${err}`);
           return;
         }
@@ -639,7 +641,8 @@ async function activatePreset(preset) {
 
           updateHudUI();
           renderPresetsList();
-          logTerminal('OK', `Verified ${preset.name} -> ${diag.latency}ms [RESOLVED]`);
+          const info = diag.answers !== undefined ? ` [${diag.answers} ANSWERS]` : '';
+          logTerminal('OK', `Verified ${preset.name} -> ${diag.latency}ms${info}`);
           showToast(`CONNECTED // ${preset.name} (${diag.latency}ms)`);
         } else {
           // Endpoint unverified or timeout, but policy was written
@@ -659,20 +662,69 @@ async function activatePreset(preset) {
     );
   } catch (err) {
     connectingPresetId = null;
-    activeState.connectionState = DNS_STATE.ERROR;
+    activeState = previousActiveState;
     updateHudUI();
     renderPresetsList();
-    logTerminal('ERR', `Execution exception: ${err.message}`);
+    logTerminal('ERR', `Execution exception: ${err.message}. Rolled back.`);
     showToast(`SYS EXCEPTION // ${err.message}`);
   }
 }
 
 /**
- * Live DoH Endpoint Test (RFC 8484 DNS Query Probe + Fallback)
+ * Parse and validate RFC 1035 / RFC 8484 binary DNS Wire response
+ */
+function parseDnsWireResponse(bytes, expectedId = 0) {
+  if (!bytes || bytes.length < 12) {
+    return { ok: false, error: 'MALFORMED_DNS_PACKET (Len < 12)' };
+  }
+
+  // 1. Transaction ID (bytes 0-1)
+  const id = (bytes[0] << 8) | bytes[1];
+  if (id !== expectedId) {
+    return { ok: false, error: `DNS_ID_MISMATCH (Expected ${expectedId}, Got ${id})` };
+  }
+
+  // 2. Flags (bytes 2-3)
+  const flags = (bytes[2] << 8) | bytes[3];
+  const qr = (flags >> 15) & 0x01; // Bit 15: 0=Query, 1=Response
+  if (qr !== 1) {
+    return { ok: false, error: 'NOT_A_DNS_RESPONSE (QR=0)' };
+  }
+
+  const opcode = (flags >> 11) & 0x0F; // Bits 11-14: OpCode (0 = Standard Query)
+  if (opcode !== 0) {
+    return { ok: false, error: `UNEXPECTED_OPCODE (${opcode})` };
+  }
+
+  const rcode = flags & 0x0F; // Bits 0-3: Reply Code
+  if (rcode !== 0) {
+    const rcodeNames = {
+      1: 'FORMERR',
+      2: 'SERVFAIL',
+      3: 'NXDOMAIN',
+      4: 'NOTIMP',
+      5: 'REFUSED'
+    };
+    return { ok: false, error: `DNS_${rcodeNames[rcode] || ('RCODE_' + rcode)}` };
+  }
+
+  // 3. Question & Answer Counts
+  const qdCount = (bytes[4] << 8) | bytes[5];
+  const anCount = (bytes[6] << 8) | bytes[7];
+
+  if (qdCount < 1) {
+    return { ok: false, error: 'NO_QUESTION_SECTION' };
+  }
+
+  return { ok: true, id, rcode, qdCount, anCount };
+}
+
+/**
+ * Live DoH Endpoint Test (RFC 8484 DNS Query Probe + Binary Packet Validation + Fallback)
  */
 async function testDohEndpoint(endpointUrl) {
   let clean = normalizeDohUrl(endpointUrl);
-  // RFC 8484 standard query for example.com (Type A, IN)
+  // RFC 8484 standard query for example.com (Type A, IN, ID 0)
   const dnsQueryBase64 = 'AAABAAABAAAAAAAAB2V4YW1wbGUDY29tAAABAAEA';
   
   let targetUrl = clean;
@@ -704,10 +756,28 @@ async function testDohEndpoint(endpointUrl) {
       return { ok: false, latency: null, error: 'RETURNS HTML (NOT DOH)' };
     }
 
-    if (res.ok) {
-      return { ok: true, latency: latency, status: res.status, resolvedUrl: clean };
-    } else {
+    if (!res.ok) {
       return { ok: false, latency: null, error: `HTTP ${res.status}` };
+    }
+
+    // 1. Binary DNS Wire Verification (RFC 8484 + RFC 1035)
+    if (contentType.includes('application/dns-message')) {
+      const arrayBuf = await res.arrayBuffer();
+      const dnsBytes = new Uint8Array(arrayBuf);
+      const parsedDns = parseDnsWireResponse(dnsBytes, 0);
+      if (!parsedDns.ok) {
+        return { ok: false, latency: null, error: parsedDns.error };
+      }
+      return {
+        ok: true,
+        latency: latency,
+        status: res.status,
+        resolvedUrl: clean,
+        answers: parsedDns.anCount
+      };
+    } else {
+      // 2. Standard 200 OK fallback
+      return { ok: true, latency: latency, status: res.status, resolvedUrl: clean };
     }
   } catch (err) {
     clearTimeout(timeoutId);
@@ -994,7 +1064,7 @@ function exportPresetsJson() {
 }
 
 /**
- * Import Presets from JSON File
+ * Import Presets from JSON File (Strict Security & HTTPS Verification)
  */
 function importPresetsJson(e) {
   const file = e.target.files && e.target.files[0];
@@ -1005,16 +1075,59 @@ function importPresetsJson(e) {
     try {
       const imported = JSON.parse(evt.target.result);
       if (Array.isArray(imported) && imported.length > 0) {
-        // Merge without duplicating URLs
+        let importedCount = 0;
+        let rejectedInsecure = 0;
+
         imported.forEach(item => {
-          if (item.name && item.url && !currentPresets.some(p => p.url.toLowerCase() === item.url.toLowerCase())) {
-            currentPresets.push(item);
+          if (!item || typeof item !== 'object') return;
+          const name = (item.name || '').trim();
+          let url = (item.url || '').trim();
+          if (!name || !url) return;
+
+          // 1. Strict HTTPS Check: Explicitly reject plaintext HTTP
+          if (url.startsWith('http://')) {
+            rejectedInsecure++;
+            logTerminal('WARN', `Security rejected insecure HTTP import: ${name}`);
+            return;
+          }
+
+          // 2. Protocol prefix & validation
+          if (!/^https?:\/\//i.test(url)) {
+            url = 'https://' + url;
+          }
+
+          try {
+            const parsed = new URL(url);
+            if (parsed.protocol !== 'https:' || parsed.hostname.length < 3) return;
+          } catch {
+            return;
+          }
+
+          const cleanUrl = normalizeDohUrl(url);
+
+          // 3. Merge without duplicating URLs
+          if (!currentPresets.some(p => p.url.toLowerCase() === cleanUrl.toLowerCase())) {
+            currentPresets.push({
+              id: 'custom-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+              name: name.slice(0, 48),
+              url: cleanUrl,
+              tag: (item.tag || 'CUSTOM').toUpperCase().slice(0, 16),
+              category: item.category || 'custom',
+              features: ['⚡ CUSTOM'],
+              isFavorite: !!item.isFavorite,
+              latency: null,
+              status: null
+            });
+            importedCount++;
           }
         });
+
         await savePresets();
         renderPresetsList();
-        logTerminal('IMPORT', `Successfully imported ${imported.length} presets.`);
-        showToast(`IMPORTED ${imported.length} PRESETS`);
+
+        const warnMsg = rejectedInsecure > 0 ? ` (${rejectedInsecure} insecure HTTP rejected)` : '';
+        logTerminal('IMPORT', `Successfully imported ${importedCount} verified presets${warnMsg}.`);
+        showToast(`IMPORTED ${importedCount} PRESETS${warnMsg}`);
       }
     } catch (err) {
       showToast('INVALID JSON FILE');
