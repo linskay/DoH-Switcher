@@ -57,6 +57,16 @@ for (const icon of fs.readdirSync(srcIcons)) {
   fs.copyFileSync(path.join(srcIcons, icon), path.join(dstIcons, icon));
 }
 
+// Copy js modules directory
+const srcJs = path.join(rootDir, 'js');
+const dstJs = path.join(stageDir, 'js');
+if (fs.existsSync(srcJs)) {
+  fs.mkdirSync(dstJs, { recursive: true });
+  for (const file of fs.readdirSync(srcJs)) {
+    fs.copyFileSync(path.join(srcJs, file), path.join(dstJs, file));
+  }
+}
+
 // Create ZIP using PowerShell Compress-Archive on Windows
 if (fs.existsSync(zipPath)) {
   fs.unlinkSync(zipPath);

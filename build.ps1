@@ -42,6 +42,10 @@ $iconsDir = Join-Path $stageDir "icons"
 New-Item -ItemType Directory -Path $iconsDir -Force | Out-Null
 Copy-Item (Join-Path $rootDir "icons\*") -Destination $iconsDir
 
+$jsDir = Join-Path $stageDir "js"
+New-Item -ItemType Directory -Path $jsDir -Force | Out-Null
+Copy-Item (Join-Path $rootDir "js\*") -Destination $jsDir
+
 if (Test-Path $zipPath) {
     Remove-Item -Force $zipPath
 }
