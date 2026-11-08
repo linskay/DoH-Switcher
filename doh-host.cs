@@ -54,9 +54,19 @@ class Program {
                 mode = "automatic";
             }
 
-            // Normalize DoH Template: Ensure RFC 8484 GET template {?dns}
+            // Normalize DoH Template: Ensure RFC 8484 GET template {?dns} and valid endpoint path
             if (mode == "secure" && !string.IsNullOrEmpty(template)) {
                 template = template.Trim();
+                if (!template.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && !template.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) {
+                    template = "https://" + template;
+                }
+                try {
+                    string cleanUri = template.Replace("{?dns}", "");
+                    Uri uri = new Uri(cleanUri);
+                    if (string.IsNullOrEmpty(uri.AbsolutePath) || uri.AbsolutePath == "/") {
+                        template = uri.GetLeftPart(UriPartial.Authority) + "/dns-query";
+                    }
+                } catch {}
                 if (!template.Contains("{?dns}") && !template.Contains("?")) {
                     template = template + "{?dns}";
                 }

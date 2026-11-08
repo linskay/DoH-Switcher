@@ -1,4 +1,4 @@
-# DoH-Switcher // CyberDNS v2.0.2
+# DoH-Switcher // CyberDNS v2.0.3
 
 Легковесное расширение (Manifest V3) для браузеров Google Chrome и Chromium для мгновенного управления и переключения между DNS-over-HTTPS (DoH) серверами в один клик с встроенной RFC 8484 диагностикой и кибер-терминалом событий.
 
@@ -81,6 +81,7 @@
 | **AdGuard DNS** | Блокировка рекламы | AdBlocker / Trackers | `https://dns.adguard-dns.com/dns-query{?dns}` |
 | **Quad9** | Защита от угроз | Threat Intel | `https://dns.quad9.net/dns-query{?dns}` |
 | **Mullvad DNS** | Строго без логов | Strict No-Logs | `https://dns.mullvad.net/dns-query{?dns}` |
+| **Dagami DNS** | Строго без логов / RU | Fast / No-Logs | `https://dns.dagami.ru/dns-query{?dns}` |
 | **Control D** | Без цензуры | Free / No-Filter | `https://freedns.controld.com/p0{?dns}` |
 
 ---
@@ -91,7 +92,7 @@
 node package.js
 ```
 
-Собранный архив сохраняется в директорию `dist/DoH-Switcher-v2.0.2.zip`.
+Собранный архив сохраняется в директорию `dist/DoH-Switcher-v2.0.3.zip`.
 
 ---
 

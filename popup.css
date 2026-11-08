@@ -162,12 +162,42 @@ body::-webkit-scrollbar-thumb:hover {
   gap: 5px;
 }
 
+.brand-hacker-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px rgba(0, 240, 255, 0.75));
+  flex-shrink: 0;
+}
+
 .state-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--neon-success);
-  box-shadow: 0 0 6px var(--neon-success);
+  display: inline-block;
+  transition: all 0.2s ease;
+}
+
+.state-dot-on {
+  background: var(--neon-success) !important;
+  box-shadow: 0 0 6px var(--neon-success) !important;
+}
+
+.state-dot-off {
+  background: var(--neon-error) !important;
+  box-shadow: 0 0 6px var(--neon-error) !important;
+}
+
+.state-dot-connecting {
+  background: var(--neon-accent) !important;
+  box-shadow: 0 0 6px var(--neon-accent) !important;
+  animation: blink-connecting 0.8s infinite alternate;
+}
+
+.state-dot-auto {
+  background: #65758B !important;
+  box-shadow: 0 0 4px #65758B !important;
 }
 
 .state-label {

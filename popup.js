@@ -70,6 +70,17 @@ const DEFAULT_PRESETS = [
     latency: null,
     status: null
   },
+    {
+    id: "dagami-dns",
+    name: "Dagami DNS",
+    url: "https://dns.dagami.ru/dns-query{?dns}",
+    tag: "STRICT NO-LOGS / RU",
+    category: "privacy",
+    features: ["⚡ FAST", "🛡 NO-LOGS"],
+    isFavorite: false,
+    latency: null,
+    status: null
+  },
   {
     id: "control-d",
     name: "Control D (Free)",
@@ -106,6 +117,8 @@ let connectingPresetId = null;
 let toastTimeout = null;
 
 // DOM Elements
+const sysStateDot = document.getElementById('sysStateDot');
+const sysStateLabel = document.getElementById('sysStateLabel');
 const masterHud = document.getElementById('masterHud');
 const connectionBadge = document.getElementById('connectionBadge');
 const activeDnsName = document.getElementById('activeDnsName');
@@ -233,8 +246,16 @@ function setupEventListeners() {
 function loadStateAndPresets() {
   return new Promise((resolve) => {
     chrome.storage.local.get(['presets', 'activeState'], (res) => {
-      if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
+            if (res.presets && Array.isArray(res.presets) && res.presets.length > 0) {
         currentPresets = res.presets;
+        // Auto-merge Dagami DNS if not present
+        if (!currentPresets.some(p => p.id === 'dagami-dns' || (p.url && p.url.includes('dagami')))) {
+          const dagami = DEFAULT_PRESETS.find(p => p.id === 'dagami-dns');
+          if (dagami) {
+            currentPresets.push(dagami);
+            savePresets();
+          }
+        }
       } else {
         currentPresets = [...DEFAULT_PRESETS];
         chrome.storage.local.set({ presets: currentPresets });
@@ -275,9 +296,28 @@ function saveActiveState() {
  */
 function normalizeDohUrl(url) {
   let clean = (url || '').trim();
-  if (clean && !clean.includes('{?dns}') && !clean.includes('?')) {
+  if (!clean) return '';
+
+  if (!clean.startsWith('https://') && !clean.startsWith('http://')) {
+    clean = 'https://' + clean;
+  }
+
+  try {
+    const rawNoQuery = clean.replace('{?dns}', '');
+    const parsed = new URL(rawNoQuery);
+    if (parsed.pathname === '' || parsed.pathname === '/') {
+      parsed.pathname = '/dns-query';
+    }
+    clean = parsed.origin + parsed.pathname;
+    if (parsed.search) {
+      clean += parsed.search;
+    }
+  } catch (e) {}
+
+  if (!clean.includes('{?dns}') && !clean.includes('?')) {
     clean += '{?dns}';
   }
+
   return clean;
 }
 
@@ -291,42 +331,73 @@ function updateHudUI() {
   const matched = currentPresets.find(p => p.id === activeState.presetId) ||
                   currentPresets.find(p => p.url.toLowerCase() === (activeState.template || '').toLowerCase());
 
-  if (activeState.connectionState === DNS_STATE.CONNECTED) {
+  if (activeState.mode === 'off') {
+    // 1. KILLSWITCH ACTIVE (OFF)
+    masterHud.classList.add('hud-error');
+    connectionBadge.className = 'hud-badge badge-error';
+    connectionBadge.textContent = 'OFFLINE (KILL)';
+    activeDnsName.textContent = 'Plaintext DNS (DoH Inactive)';
+    activeDnsUrl.textContent = 'All DoH tunnels terminated';
+    activePolicyStatus.textContent = 'DISABLED';
+    activeLatency.textContent = '-- ms';
+
+    if (sysStateDot) {
+      sysStateDot.className = 'state-dot state-dot-off';
+    }
+    if (sysStateLabel) {
+      sysStateLabel.textContent = 'DOH OFF';
+      sysStateLabel.style.color = 'var(--neon-error)';
+    }
+  } else if (activeState.connectionState === DNS_STATE.CONNECTED && activeState.mode === 'secure') {
+    // 2. CONNECTED (ONLINE)
     masterHud.classList.add('hud-connected');
     connectionBadge.classList.add('badge-connected');
     connectionBadge.textContent = 'CONNECTED';
-
     activeDnsName.textContent = matched ? matched.name : 'Custom DoH Endpoint';
     activeDnsUrl.textContent = activeState.template || 'https://...';
     activePolicyStatus.textContent = 'ENFORCED';
     activeLatency.textContent = activeState.lastVerifiedLatency ? `${activeState.lastVerifiedLatency} ms` : '-- ms';
-  } else if (activeState.connectionState === DNS_STATE.CONNECTING) {
+
+    if (sysStateDot) {
+      sysStateDot.className = 'state-dot state-dot-on';
+    }
+    if (sysStateLabel) {
+      sysStateLabel.textContent = 'DOH ONLINE';
+      sysStateLabel.style.color = 'var(--neon-success)';
+    }
+  } else if (activeState.connectionState === DNS_STATE.CONNECTING || activeState.connectionState === DNS_STATE.VERIFYING) {
+    // 3. SWITCHING / PROBING
     masterHud.classList.add('hud-connecting');
     connectionBadge.classList.add('badge-connecting');
-    connectionBadge.textContent = 'CONNECTING...';
-
+    connectionBadge.textContent = activeState.connectionState === DNS_STATE.VERIFYING ? 'VERIFYING...' : 'CONNECTING...';
     activeDnsName.textContent = matched ? matched.name : 'Switching DoH...';
     activeDnsUrl.textContent = activeState.template || 'https://...';
-    activePolicyStatus.textContent = 'UPDATING';
+    activePolicyStatus.textContent = 'PROBING';
     activeLatency.textContent = 'TESTING';
-  } else if (activeState.connectionState === DNS_STATE.VERIFYING) {
-    masterHud.classList.add('hud-connecting');
-    connectionBadge.classList.add('badge-connecting');
-    connectionBadge.textContent = 'VERIFYING...';
-    activePolicyStatus.textContent = 'TESTING PROBE';
-  } else if (activeState.connectionState === DNS_STATE.ERROR) {
-    masterHud.classList.add('hud-error');
-    connectionBadge.classList.add('badge-error');
-    connectionBadge.textContent = 'ERROR';
-    activePolicyStatus.textContent = 'FAILED';
+
+    if (sysStateDot) {
+      sysStateDot.className = 'state-dot state-dot-connecting';
+    }
+    if (sysStateLabel) {
+      sysStateLabel.textContent = 'CONNECTING...';
+      sysStateLabel.style.color = 'var(--neon-accent)';
+    }
   } else {
-    // DISCONNECTED or AUTOMATIC
+    // 4. SYSTEM AUTO
     connectionBadge.classList.add('badge-idle');
-    connectionBadge.textContent = (activeState.mode === 'off') ? 'DISABLED (OFF)' : 'SYSTEM AUTO';
-    activeDnsName.textContent = (activeState.mode === 'off') ? 'Plaintext DNS (DoH Inactive)' : 'Opportunistic System Resolver';
-    activeDnsUrl.textContent = (activeState.mode === 'off') ? 'Standard OS unencrypted resolution' : 'Chromium automatic opportunistic DoH';
-    activePolicyStatus.textContent = (activeState.mode === 'off') ? 'DISABLED' : 'DEFAULT';
+    connectionBadge.textContent = 'SYSTEM AUTO';
+    activeDnsName.textContent = 'Opportunistic System Resolver';
+    activeDnsUrl.textContent = 'Chromium automatic opportunistic DoH';
+    activePolicyStatus.textContent = 'DEFAULT';
     activeLatency.textContent = '-- ms';
+
+    if (sysStateDot) {
+      sysStateDot.className = 'state-dot state-dot-auto';
+    }
+    if (sysStateLabel) {
+      sysStateLabel.textContent = 'AUTO DNS';
+      sysStateLabel.style.color = 'var(--text-secondary)';
+    }
   }
 }
 
