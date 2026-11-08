@@ -108,6 +108,7 @@ let toastTimeout = null;
 // DOM Elements
 const sysStateDot = document.getElementById('sysStateDot');
 const sysStateLabel = document.getElementById('sysStateLabel');
+const brandHackerIcon = document.getElementById('brandHackerIcon');
 const masterHud = document.getElementById('masterHud');
 const connectionBadge = document.getElementById('connectionBadge');
 const activeDnsName = document.getElementById('activeDnsName');
@@ -307,6 +308,11 @@ function normalizeDohUrl(url) {
  * Update Master HUD UI based on current activeState
  */
 function updateHudUI() {
+  if (brandHackerIcon) {
+    brandHackerIcon.src = (activeState.mode === 'secure' && activeState.connectionState === DNS_STATE.CONNECTED)
+      ? 'icons/icon-32.png'
+      : 'icons/icon-off-32.png';
+  }
   masterHud.classList.remove('hud-connected', 'hud-connecting', 'hud-error');
   connectionBadge.className = 'hud-badge';
 

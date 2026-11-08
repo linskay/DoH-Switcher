@@ -1,43 +1,41 @@
 /**
  * DoH-Switcher // CyberDNS v2.0 - Background Service Worker
- * Manages badge status synchronized with persistent storage
+ * Dynamic icon switching: Neon colored when ON, black/dark when OFF
  */
+
+const ICONS_ACTIVE = {
+  "16": "icons/icon-16.png",
+  "32": "icons/icon-32.png",
+  "48": "icons/icon-48.png",
+  "128": "icons/icon-128.png"
+};
+
+const ICONS_OFF = {
+  "16": "icons/icon-off-16.png",
+  "32": "icons/icon-off-32.png",
+  "48": "icons/icon-off-48.png",
+  "128": "icons/icon-off-128.png"
+};
 
 function updateBadge(activeState) {
   try {
-    if (!activeState) {
-      chrome.action.setBadgeText({ text: '' });
-      return;
-    }
+    // 1. Remove the text badge completely per user request
+    chrome.action.setBadgeText({ text: '' });
 
-    if (activeState.connectionState === 'connected' && activeState.mode === 'secure') {
-      chrome.action.setBadgeText({ text: 'ON' });
-      chrome.action.setBadgeBackgroundColor({ color: '#00FFA3' }); // Neon Green
-      if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#090B12' });
-      }
-    } else if (activeState.connectionState === 'connecting') {
-      chrome.action.setBadgeText({ text: '...' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FCEE0A' }); // Accent Yellow
-      if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#090B12' });
-      }
-    } else if (activeState.mode === 'off') {
-      chrome.action.setBadgeText({ text: 'OFF' });
-      chrome.action.setBadgeBackgroundColor({ color: '#FF3158' }); // Error Red
-      if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#FFFFFF' });
-      }
+    // 2. Switch icon based on ON vs OFF state
+    const isOnline = activeState && activeState.mode === 'secure' && activeState.connectionState === 'connected';
+
+    if (isOnline) {
+      // Colored glowing neon hacker icon
+      chrome.action.setIcon({ path: ICONS_ACTIVE });
+      chrome.action.setTitle({ title: `DoH-Switcher: ONLINE (${activeState.template || 'Active'})` });
     } else {
-      // mode === 'automatic'
-      chrome.action.setBadgeText({ text: 'AUTO' });
-      chrome.action.setBadgeBackgroundColor({ color: '#252D3D' }); // Steel Slate
-      if (chrome.action.setBadgeTextColor) {
-        chrome.action.setBadgeTextColor({ color: '#DCE7F5' });
-      }
+      // Dark/black monochrome hacker icon (lights off)
+      chrome.action.setIcon({ path: ICONS_OFF });
+      chrome.action.setTitle({ title: activeState && activeState.mode === 'off' ? 'DoH-Switcher: OFF (Killswitch)' : 'DoH-Switcher: AUTO' });
     }
   } catch (err) {
-    console.error('[DoH-Switcher] Failed to update badge:', err);
+    console.error('[DoH-Switcher] Failed to update action icon:', err);
   }
 }
 
