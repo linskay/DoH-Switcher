@@ -10,6 +10,15 @@ class Program {
     [DllImport("dnsapi.dll", EntryPoint = "DnsFlushResolverCache")]
     static extern int DnsFlushResolverCache();
 
+    [DllImport("userenv.dll", SetLastError = true)]
+    static extern bool RefreshPolicy(bool bMachine);
+
+    [DllImport("userenv.dll", SetLastError = true)]
+    static extern bool RefreshPolicyEx(bool bMachine, uint dwOptions);
+
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+    static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+
     static void Main(string[] args) {
         try {
             Stream stdin = Console.OpenStandardInput();
@@ -131,7 +140,7 @@ class Program {
             // 1. Write Registry Policies Atomically (HKLM + HKCU)
             try {
                 regOk = SetRegistryPolicies(mode, template);
-            } catch (Exception ex) {
+            } catch {
                 regOk = false;
             }
 
@@ -149,6 +158,16 @@ class Program {
             } catch {
                 cacheOk = false;
             }
+
+            // 4. Force Windows Group Policy Engine Refresh & Broadcast Change
+            try {
+                RefreshPolicy(true);
+                RefreshPolicy(false);
+                RefreshPolicyEx(true, 1);
+                RefreshPolicyEx(false, 1);
+                UIntPtr dummy;
+                SendMessageTimeout(new IntPtr(0xffff), 0x001A, UIntPtr.Zero, "Policy", 2, 100, out dummy);
+            } catch {}
 
             // Determine overall success: either registry or local state succeeded
             bool overallSuccess = (regOk || localStateOk);
