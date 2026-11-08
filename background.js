@@ -28,7 +28,8 @@ function updateBadge(activeState) {
     if (isOnline) {
       // Colored glowing neon hacker icon
       chrome.action.setIcon({ path: ICONS_ACTIVE });
-      chrome.action.setTitle({ title: `DoH-Switcher: ONLINE (${activeState.template || 'Active'})` });
+      const cleanTitle = (activeState.template || 'Active').replace(/\{(\?)?dns\}/gi, '');
+      chrome.action.setTitle({ title: `DoH-Switcher: ONLINE (${cleanTitle})` });
     } else {
       // Dark/black monochrome hacker icon (lights off)
       chrome.action.setIcon({ path: ICONS_OFF });

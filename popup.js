@@ -311,6 +311,14 @@ function normalizeDohUrl(url) {
 }
 
 /**
+ * Format DoH URL for display in UI (stripping {?dns} / {dns} template variables)
+ */
+function formatDisplayUrl(url) {
+  if (!url) return '';
+  return url.replace(/\{(\?)?dns\}/gi, '');
+}
+
+/**
  * Update Master HUD UI based on current activeState
  */
 function updateHudUI() {
@@ -348,7 +356,7 @@ function updateHudUI() {
     connectionBadge.classList.add('badge-connected');
     connectionBadge.textContent = 'CONNECTED';
     activeDnsName.textContent = matched ? matched.name : 'Custom DoH Endpoint';
-    activeDnsUrl.textContent = activeState.template || 'https://...';
+    activeDnsUrl.textContent = formatDisplayUrl(activeState.template) || 'https://...';
     activePolicyStatus.textContent = 'ENFORCED';
     activeLatency.textContent = activeState.lastVerifiedLatency ? `${activeState.lastVerifiedLatency} ms` : '-- ms';
 
@@ -365,7 +373,7 @@ function updateHudUI() {
     connectionBadge.classList.add('badge-connecting');
     connectionBadge.textContent = activeState.connectionState === DNS_STATE.VERIFYING ? 'VERIFYING...' : 'CONNECTING...';
     activeDnsName.textContent = matched ? matched.name : 'Switching DoH...';
-    activeDnsUrl.textContent = activeState.template || 'https://...';
+    activeDnsUrl.textContent = formatDisplayUrl(activeState.template) || 'https://...';
     activePolicyStatus.textContent = 'PROBING';
     activeLatency.textContent = 'TESTING';
 
@@ -465,10 +473,10 @@ function renderPresetsList() {
     }
     details.appendChild(titleRow);
 
-    // URL
+    // URL (clean display without {?dns})
     const urlSpan = document.createElement('span');
     urlSpan.className = 'card-url';
-    urlSpan.textContent = preset.url;
+    urlSpan.textContent = formatDisplayUrl(preset.url);
     details.appendChild(urlSpan);
 
     // Metrics Row (Latency & Status)
@@ -885,7 +893,7 @@ function validateInjectForm() {
   }
 
   const normalized = normalizeDohUrl(url);
-  urlValidationMsg.textContent = `TARGET: ${normalized}`;
+  urlValidationMsg.textContent = `TARGET: ${formatDisplayUrl(normalized)}`;
   urlValidationMsg.className = 'url-msg valid';
   btnSubmitInject.disabled = (name.length === 0);
 }
